@@ -91,7 +91,7 @@ body.touch #tip{display:none}
 </div>
 <script>
 'use strict';
-/* ===== ZINI CITY — Спринт 8: рынок выходного дня + дождь ===== */
+/* ===== ZINI CITY — Спринт 9: автобус, порт «Восточный», мастер Борис ===== */
 const $=id=>document.getElementById(id);
 const IS_TOUCH=('ontouchstart' in window)||navigator.maxTouchPoints>0;
 if(IS_TOUCH)document.body.classList.add('touch');
@@ -469,6 +469,7 @@ function dirt(x,z,w,l){
 }
 dirt(-74,8.5,3.2,18);dirt(-82,20,3.2,24);
 dirt(70,-10,3.5,30);
+dirt(115,45,4,110);
 const geoCache={};
 function roundedBox(w,h,d,r){
  const k=w+'_'+h+'_'+d+'_'+r;
@@ -580,6 +581,7 @@ function lamp(x,z,withLight){
 }
 lamp(3.5,-4.5,true);lamp(-3.5,6,false);lamp(3.5,18,true);lamp(-3.5,24,false);
 lamp(7.5,24,true);
+lamp(150,40,true);lamp(190,52,true);
 const plot=new THREE.Mesh(new THREE.PlaneGeometry(12,12),matOf(0x7fae57));
 plot.rotation.x=-Math.PI/2;plot.position.set(0,0.02,30);plot.receiveShadow=true;plot.userData.plot=true;scene.add(plot);pickables.push(plot);
 function fenceLine(x1,z1,x2,z2){
@@ -760,12 +762,12 @@ const zoneRing=new THREE.Mesh(new THREE.TorusGeometry(1.1,0.08,8,32),new THREE.M
 zoneRing.rotation.x=-Math.PI/2;zoneRing.position.copy(ZONE);scene.add(zoneRing);
 sign('ГРУЗ · СДАЧА',ZONE.x,1.6,ZONE.z,0.6);
 const crateMat=new THREE.MeshStandardMaterial({map:crateTex,roughness:0.9});
-let jobActive=false,jobTime=0,boxesLeft=0,carrying=null,carryCount=0;
+let jobActive=false,jobTime=0,boxesLeft=0,carrying=null,carryCount=0,jobType='';
 const jobBoxes=[];
-function spawnJobBox(){
+function spawnJobBox(x,z){
  const m=new THREE.Mesh(roundedBox(0.62,0.55,0.62,0.06),crateMat);
  m.castShadow=true;m.receiveShadow=true;
- m.position.set(-4+Math.random()*8,0.28,-4.6+Math.random()*1.6);
+ m.position.set(x!==undefined?x:(-4+Math.random()*8),0.28,z!==undefined?z:(-4.6+Math.random()*1.6));
  scene.add(m);jobBoxes.push(m);
 }
 function setCarryStack(n){
@@ -774,7 +776,7 @@ function setCarryStack(n){
 function clearJob(){
  jobBoxes.forEach(b=>scene.remove(b));
  jobBoxes.length=0;
- carrying=null;carryCount=0;
+ carrying=null;carryCount=0;jobType='';
  carryGroup.visible=false;setCarryStack(0);carryStack.visible=false;
  held.visible=true;
  jobActive=false;
@@ -782,7 +784,7 @@ function clearJob(){
 }
 function startJob(){
  clearJob();
- jobActive=true;jobTime=120;boxesLeft=5;
+ jobActive=true;jobType='city';jobTime=120;boxesLeft=5;
  for(let i=0;i<5;i++)spawnJobBox();
  $('jobChip').style.display='';
  updateJobChip();
@@ -796,12 +798,12 @@ function endJob(bonus){
  if(extra>0){setMoney(money+extra);toast('Ящики сданы в последний момент: +'+extra+' ₽');}
  held.visible=true;
  clearJob();
- if(bonus){setMoney(money+50);coin();toast('Смена окончена! Бонус +50 ₽ 👏');}
+ if(bonus){const bo=jobType==='port'?100:50;setMoney(money+bo);coin();toast('Смена окончена! Бонус +'+bo+' ₽ 👏');}
  else toast('Смена окончена. Заходи ещё!');
 }
 function updateJobChip(){
  const m=Math.floor(jobTime/60),s=Math.floor(jobTime%60);
- $('jobChip').textContent='📦 '+(5-boxesLeft)+'/5 · '+m+':'+(s<10?'0':'')+s;
+ $('jobChip').textContent='📦 '+(jobType==='port'?6:5)-boxesLeft<0?0:(jobType==='port'?6:5)-boxesLeft+'/5 · '+m+':'+(s<10?'0':'')+s;
 }
 const carryGroup=new THREE.Group();
 const carryMesh=new THREE.Mesh(roundedBox(0.5,0.45,0.5,0.05),crateMat);
@@ -812,7 +814,7 @@ carryGroup.visible=false;
 camera.add(carryGroup);
 const carryStack=new THREE.Group();
 (function(){
- const offs=[[0,-0.34],[0,0.10],[0,0.54],[-0.13,-0.12],[0.13,-0.12]];
+ const offs=[[0,-0.34],[0,0.10],[0,0.54],[-0.13,-0.12],[0.13,-0.12],[0,-0.9]];
  offs.forEach(o=>{
   const c=new THREE.Mesh(roundedBox(0.4,0.42,0.4,0.04),crateMat);
   c.position.set(o[0]-0.16,o[1],-0.6);
@@ -936,38 +938,121 @@ marketNpc.position.copy(MARKET_NPC);scene.add(marketNpc);
 solids.push({minX:MARKET_NPC.x-0.4,maxX:MARKET_NPC.x+0.4,minY:0,maxY:1.9,minZ:MARKET_NPC.z-0.4,maxZ:MARKET_NPC.z+0.4});
 sign('МАРИЯ · РЫНОК',MARKET_NPC.x,2.4,MARKET_NPC.z,0.56);
 function marketOpen(){const h=(dayT*24+6)%24;return h>=9&&h<15;}
-/* ===== АВТОМАШИНА ===== */
-const car=new THREE.Group();
-const carHeadMats=[],carTailMats=[];
+/* ===== АВТОБУС №7 (Спринт 9) ===== */
+function makeBusMesh(color){
+ const g=new THREE.Group();
+ const body=new THREE.Mesh(roundedBox(5.2,1.7,2.2,0.25),matOf(color));
+ body.position.y=1.5;body.castShadow=true;g.add(body);
+ const roof=new THREE.Mesh(roundedBox(5.3,0.18,2.3,0.1),matOf(0xe8e8e8));
+ roof.position.y=2.42;g.add(roof);
+ [-1.7,-0.55,0.55,1.7].forEach(ox=>{
+  [-1,1].forEach(s=>{
+   const w=new THREE.Mesh(new THREE.BoxGeometry(0.85,0.6,0.06),new THREE.MeshStandardMaterial({color:0x9ecfe8,roughness:0.1,metalness:0.3,transparent:true,opacity:0.75}));
+   w.position.set(ox,1.75,s*1.12);g.add(w);
+  });
+ });
+ const front=new THREE.Mesh(new THREE.BoxGeometry(2.2,0.8,0.06),new THREE.MeshStandardMaterial({color:0x9ecfe8,roughness:0.1,metalness:0.3,transparent:true,opacity:0.75}));
+ front.position.set(-2.62,1.6,0);g.add(front);
+ const door=new THREE.Mesh(new THREE.BoxGeometry(0.7,1.3,0.06),matOf(0x3a4250));
+ door.position.set(-0.5,0.95,-1.12);g.add(door);
+ const wg=new THREE.CylinderGeometry(0.38,0.38,0.26,12);
+ [[-1.9,1.05],[-1.9,-1.05],[1.9,1.05],[1.9,-1.05]].forEach(p=>{
+  const w=new THREE.Mesh(wg,matOf(0x1c1c1e));
+  w.rotation.z=Math.PI/2;w.position.set(p[0],0.38,p[1]);g.add(w);
+ });
+ [[-2.65,0.7],[-2.65,-0.7]].forEach(p=>{
+  const h=new THREE.Mesh(new THREE.SphereGeometry(0.12,8,6),new THREE.MeshStandardMaterial({color:0xfff4c0,emissive:0xffe080,emissiveIntensity:0.4}));
+  h.position.set(p[0],0.9,p[1]);g.add(h);
+ });
+ g.traverse(o=>{if(o.isMesh)o.castShadow=true;});
+ return g;
+}
+const CITY_BUS_POS=new THREE.Vector3(26,0,-4.4);
+const cityBus=makeBusMesh(0x2f7ad0);
+cityBus.position.copy(CITY_BUS_POS);scene.add(cityBus);
+solids.push({minX:23.2,maxX:28.8,minY:0,maxY:2.5,minZ:-5.6,maxZ:-3.2});
+sign('АВТОБУС №7 · ПОРТ',26,3.4,-4.4,0.6);
+const PORT_BUS_POS=new THREE.Vector3(148,0,38);
+const portBus=makeBusMesh(0xd8a02f);
+portBus.position.copy(PORT_BUS_POS);portBus.rotation.y=Math.PI/2;scene.add(portBus);
+solids.push({minX:146.8,maxX:149.2,minY:0,maxY:2.5,minZ:35.2,maxZ:40.8});
+sign('АВТОБУС №7 · ГОРОД',148,3.4,38,0.6);
+/* ===== ПОРТ «ВОСТОЧНЫЙ» (Спринт 9) ===== */
+const waterBig=new THREE.Mesh(new THREE.PlaneGeometry(140,140),new THREE.MeshStandardMaterial({color:0x3a7ac8,roughness:0.2,metalness:0.1,transparent:true,opacity:0.95}));
+waterBig.rotation.x=-Math.PI/2;waterBig.position.set(215,0.05,45);waterBig.receiveShadow=true;scene.add(waterBig);
+const pierTex=dirtTex.clone();pierTex.needsUpdate=true;pierTex.repeat.set(9,2);
+const pier=new THREE.Mesh(new THREE.PlaneGeometry(70,16),new THREE.MeshStandardMaterial({map:pierTex,roughness:1}));
+pier.rotation.x=-Math.PI/2;pier.position.set(178,0.1,45);pier.receiveShadow=true;pier.userData.ground=true;scene.add(pier);
+const ship=new THREE.Group();
 (function(){
- const body=new THREE.Mesh(roundedBox(3.6,0.7,1.7,0.2),matOf(0xd84a3a));
- body.position.y=0.75;body.castShadow=true;car.add(body);
- const cab=new THREE.Mesh(roundedBox(1.8,0.55,1.5,0.18),new THREE.MeshStandardMaterial({color:0x9ecfe8,roughness:0.1,metalness:0.3,transparent:true,opacity:0.75}));
- cab.position.set(-0.2,1.35,0);cab.castShadow=true;car.add(cab);
- const roof=new THREE.Mesh(roundedBox(1.9,0.1,1.55,0.1),matOf(0xb03a2e));
- roof.position.set(-0.2,1.62,0);car.add(roof);
- const wheelGeo=new THREE.CylinderGeometry(0.34,0.34,0.24,12);
- const wheelMat=matOf(0x1c1c1e);
- car.userData.wheels=[];
- [[-1.15,0.85],[-1.15,-0.85],[1.15,0.85],[1.15,-0.85]].forEach(p=>{
-  const w=new THREE.Mesh(wheelGeo,wheelMat);
-  w.rotation.z=Math.PI/2;
-  w.position.set(p[0],0.34,p[1]);
-  car.add(w);car.userData.wheels.push(w);
- });
- [[-1.75,0.5],[-1.75,-0.5]].forEach(p=>{
-  const m=new THREE.MeshStandardMaterial({color:0xfff4c0,emissive:0xffe080,emissiveIntensity:0.6});
-  const hl=new THREE.Mesh(new THREE.SphereGeometry(0.12,8,6),m);
-  hl.position.set(p[0],0.75,p[1]);car.add(hl);carHeadMats.push(m);
- });
- [[1.75,0.5],[1.75,-0.5]].forEach(p=>{
-  const m=new THREE.MeshStandardMaterial({color:0xff5a3a,emissive:0xcc2210,emissiveIntensity:0.5});
-  const tl=new THREE.Mesh(new THREE.SphereGeometry(0.1,8,6),m);
-  tl.position.set(p[0],0.75,p[1]);car.add(tl);carTailMats.push(m);
- });
+ const hull=new THREE.Mesh(roundedBox(12,2.6,4.6,0.5),matOf(0x2a4a6a));
+ hull.position.y=1.3;hull.castShadow=true;ship.add(hull);
+ const deck=new THREE.Mesh(roundedBox(11,0.25,4.2,0.1),matOf(0x8a6a42));
+ deck.position.y=2.7;deck.castShadow=true;ship.add(deck);
+ const cabin=new THREE.Mesh(roundedBox(3,1.6,3.4,0.2),matOf(0xe8e4da));
+ cabin.position.set(-3.4,3.6,0);cabin.castShadow=true;ship.add(cabin);
+ const mast=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.12,4,8),matOf(0x5a4a30));
+ mast.position.set(2.5,4.8,0);ship.add(mast);
+ ship.traverse(o=>{if(o.isMesh)o.castShadow=true;});
 })();
-scene.add(car);
-let carX=-55,carDir=1,carSpeed=8;
+const shipFlag=new THREE.Mesh(new THREE.PlaneGeometry(1.2,0.7),new THREE.MeshStandardMaterial({color:0xd84a3a,side:THREE.DoubleSide,emissive:0x882222,emissiveIntensity:0.2}));
+shipFlag.position.set(2.5,7.0,0);ship.add(shipFlag);
+ship.position.set(198,0,45);ship.rotation.y=Math.PI/2;
+scene.add(ship);
+solids.push({minX:195.4,maxX:200.6,minY:0,maxY:2.9,minZ:38.8,maxZ:51.2});
+const contCols=[0xd86a4a,0x4a8ad8,0x4ac86a,0xd8c04a,0x8a6ad8,0xd84a8a];
+const contSpots=[[168,40],[171,40],[168,43],[171,43],[160,49],[163,49]];
+contSpots.forEach((p,i)=>{
+ const c=new THREE.Mesh(roundedBox(2.2,1.3,1.3,0.06),matOf(contCols[i%6]));
+ c.position.set(p[0],0.65,p[1]);c.rotation.y=(i%3)*0.06;
+ c.castShadow=true;c.receiveShadow=true;c.userData.city=true;scene.add(c);
+ const b=new THREE.Box3().setFromObject(c);
+ solids.push({minX:b.min.x,maxX:b.max.x,minY:0,maxY:b.max.y,minZ:b.min.z,maxZ:b.max.z});
+ statics.push(c);pickables.push(c);
+});
+(function(){
+ const g=new THREE.Group();
+ const legMat=matOf(0xd8a02f);
+ [-3,3].forEach(lx=>{
+  const leg=new THREE.Mesh(new THREE.BoxGeometry(0.4,7,0.4),legMat);
+  leg.position.set(186+lx,3.5,52);leg.castShadow=true;g.add(leg);
+ });
+ const beam=new THREE.Mesh(new THREE.BoxGeometry(8,0.5,0.6),legMat);
+ beam.position.set(186,7.1,52);beam.castShadow=true;g.add(beam);
+ const cable=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,3,6),matOf(0x3a4250));
+ cable.position.set(186,5.4,52);g.add(cable);
+ const hook=new THREE.Mesh(roundedBox(0.5,0.4,0.5,0.06),matOf(0x3a4250));
+ hook.position.set(186,3.8,52);g.add(hook);
+ scene.add(g);
+ solids.push({minX:182.8,maxX:189.2,minY:0,maxY:0.4,minZ:51.6,maxZ:52.4});
+})();
+addSolidBox(160,56,10,4.5,8,0x9aa2aa,0.25);
+addSolidBoxY(160,4.75,56,11,0.5,9,0x5a6270,0.18);
+sign('ПОРТОВЫЙ СКЛАД',160,5.8,56,0.62);
+const PORT_ZONE=new THREE.Vector3(166,0.15,52);
+const portRing=new THREE.Mesh(new THREE.TorusGeometry(1.1,0.08,8,32),new THREE.MeshStandardMaterial({color:0xffd86b,emissive:0xffc040,emissiveIntensity:0.7}));
+portRing.rotation.x=-Math.PI/2;portRing.position.copy(PORT_ZONE);scene.add(portRing);
+sign('ГРУЗ ПОРТА',PORT_ZONE.x,1.7,PORT_ZONE.z,0.6);
+const PORT_NPC=new THREE.Vector3(153,0,52);
+const portNpc=makePerson({shirt:0xe07a1f,pants:0x3a4250,hat:0xffd040,hair:0x2a2a2a});
+portNpc.position.copy(PORT_NPC);scene.add
+portNpc.position.copy(PORT_NPC);scene.add(portNpc);
+solids.push({minX:PORT_NPC.x-0.4,maxX:PORT_NPC.x+0.4,minY:0,maxY:1.9,minZ:PORT_NPC.z-0.4,maxZ:PORT_NPC.z+0.4});
+sign('БОРИС · МАСТЕР ПОРТА',PORT_NPC.x,2.4,PORT_NPC.z,0.6);
+function startPortJob(){
+ clearJob();
+ jobActive=true;jobType='port';jobTime=150;boxesLeft=6;
+ for(let i=0;i<6;i++){
+  spawnJobBox(165+(i%3)*2.6,41+(i/3|0)*2.8);
+ }
+ $('jobChip').style.display='';
+ updateJobChip();
+ toast('Портовая смена! 6 ящиков с причала — к жёлтому кольцу 💼');
+}
+function canRide(){
+ if(jobActive&&(carrying||carryCount>0)){toast('Сначала сдай груз!');return false;}
+ return true;
+}
 const chopTrees=[];
 function spawnForestTree(x,z){
  const g=new THREE.Group();
@@ -1344,7 +1429,18 @@ function dayF(){
  const h=Math.sin(dayT*Math.PI*2);
  return THREE.MathUtils.clamp(h*1.6+0.1,0,1);
 }
-function payPerBox(){const base=dayF()<0.4?45:30;return rainF>0.5?base+10:base;}
+/* городская смена: 30/45 (+10 в дождь), портовая всегда 50 */
+function payPerBox(){
+ if(jobType==='port')return 50;
+ const base=dayF()<0.4?45:30;
+ return rainF>0.5?base+10:base;
+}
+/* корректная версия чипа смены — перекрывает раннее объявление */
+function updateJobChip(){
+ const tot=jobType==='port'?6:5;
+ const m=Math.floor(jobTime/60),s=Math.floor(jobTime%60);
+ $('jobChip').textContent='📦 '+(tot-boxesLeft)+'/'+tot+' · '+m+':'+(s<10?'0':'')+s;
+}
 function updateDayNight(){
  const h=Math.sin(dayT*Math.PI*2);
  const df=dayF();
@@ -1373,13 +1469,24 @@ function updateDayNight(){
  const hh=Math.floor((dayT*24+6)%24),mm=Math.floor((((dayT*24+6)%24)%1)*60);
  $('dayChip').textContent=(lampsOn?'🌙 ':'☀ ')+(hh<10?'0':'')+hh+':'+(mm<10?'0':'')+mm+(rainF>0.3?' 🌧':'');
 }
+/* --- АВТОБУС: поездки --- */
+function busRide(toPort){
+ if(!canRide())return;
+ if(money<20){toast('Не хватает 20 ₽ на проезд');return;}
+ setMoney(money-20);
+ if(toPort){player.set(146,0,42);yaw=Math.PI*1.3;pitch=-0.05;toast('Автобус №7 → порт «Восточный» 🚌');}
+ else{player.set(29,0,-2);yaw=Math.PI*0.7;pitch=-0.05;toast('Автобус №7 → ZINI CITY 🏙');}
+ saveWorld();sfx(300,0.3,'triangle',0.05);
+ closeDialog();
+}
 /* --- ДИАЛОГИ --- */
 let dlgOpen=false,dlgMode='npc',dlgWho=null;
 function openDialog(mode,who){
  dlgMode=mode;dlgWho=who||null;
  dlgOpen=true;
  $('dlg').style.display='flex';
- $('dlgName').textContent=who?who:(mode==='npc'?'БИРЖА ТРУДА · Тимофей':(mode==='shop'?'СТРОЙМАТЕРИАЛЫ · Валентина':(mode==='anna'?'СОСЕДКА · Анна':(mode==='petr'?'СОСЕД · Пётр':(mode==='market'?'РЫНОК · МАРИЯ':'КИРПИЧНЫЙ ЗАВОД ZINI BRICK')))));
+ const names={npc:'БИРЖА ТРУДА · Тимофей',shop:'СТРОЙМАТЕРИАЛЫ · Валентина',anna:'СОСЕДКА · Анна',petr:'СОСЕД · Пётр',market:'РЫНОК · МАРИЯ',port:'ПОРТ · МАСТЕР БОРИС',bus:'АВТОБУС №7',plant:'КИРПИЧНЫЙ ЗАВОД ZINI BRICK'};
+ $('dlgName').textContent=who||names[mode]||'ZINI CITY';
  renderDialog();
  if(document.pointerLockElement)document.exitPointerLock();
  $('lockHint').style.display='none';
@@ -1400,11 +1507,24 @@ function buy(k){
 }
 function renderDialog(){
  const btns=$('dlgBtns');btns.innerHTML='';
- if(dlgMode==='anna'||dlgMode==='petr'){
+ if(dlgMode==='bus'){
+  const toPort=Math.hypot(CITY_BUS_POS.x-player.x,CITY_BUS_POS.z-player.z)<6;
+  $('dlgText').textContent='Автобус №7: «Восточный» — город. Проезд 20 ₽, оплата на месте. Багаж до 5 ящиков на тележке везём бесплатно 🙂';
+  const b=document.createElement('button');b.className='dbtn';
+  b.textContent=toPort?'В порт «Восточный» (20 ₽)':'В ZINI CITY (20 ₽)';
+  b.disabled=money<20;
+  b.onclick=()=>busRide(toPort);
+  btns.appendChild(b);
+ }else if(dlgMode==='port'){
+  $('dlgText').textContent='Борис: Работа есть всегда, хоть ночью. Смена: 6 ящиков с причала отнести к жёлтому кольцу — 50 ₽ за ящик, бонус 100 ₽ за всю смену. Вода рядом, смотри под ноги!';
+  const b=document.createElement('button');b.className='dbtn';b.textContent='Взять смену в порту (+50 ₽/ящик)';
+  b.onclick=()=>{closeDialog();startPortJob();};
+  btns.appendChild(b);
+ }else if(dlgMode==='anna'||dlgMode==='petr'){
   const gift=localStorage.getItem(dlgMode==='anna'?'mg_gift_anna':'mg_gift_petr');
   const line=dlgMode==='anna'
    ?('Привет, '+NICK+'! Ты новосёл с этого участка? Какой простор! Держи на новоселье монету — и заходи в парк, там качели и фонтан 🙂')
-   :('О, сосед! Слышал, у тебя теперь гараж с тележкой — ночью грузчикам платят 45 ₽ за ящик. Вечерняя смена — золотая.');
+   :('О, сосед! Слышал, теперь и порт открыли — автобус №7 ходит. Там платят по 50 ₽ за ящик, хоть круглые сутки.');
   $('dlgText').textContent=line;
   if(!gift){
    const b=document.createElement('button');b.className='dbtn';
@@ -1450,14 +1570,14 @@ function renderDialog(){
   $('dlgText').textContent='Смена идёт! Осталось ящиков: '+boxesLeft+(trolleyCarried?' — с тележкой грузи все разом!':'. Носи по одному или возьми тележку в гараже.');
   const b=document.createElement('button');b.className='dbtn alt';b.textContent='Завершить смену досрочно';b.onclick=()=>{closeDialog();endJob(false);};btns.appendChild(b);
  }else{
-  $('dlgText').textContent='Здравствуй, '+NICK+'! Смена грузчика: 5 ящиков — 30 ₽ за ящик (ночью 45 ₽, в дождь +10 ₽) и 50 ₽ бонуса. Тележка — в гараже. Рынок Марии работает с 9 до 15 — скупает дорого.';
+  $('dlgText').textContent='Здравствуй, '+NICK+'! Смена грузчика: 5 ящиков — 30 ₽ (ночью 45 ₽, в дождь +10 ₽), бонус 50 ₽. А в порту теперь платят по 50 ₽ за ящик — автобус №7 у вокзала, проезд 20 ₽.';
   const b=document.createElement('button');b.className='dbtn';b.textContent='Устроиться на смену ('+payPerBox()+' ₽/ящик)';b.onclick=()=>{closeDialog();startJob();};btns.appendChild(b);
  }
  const c=document.createElement('button');c.className='dbtn alt';c.textContent='Закрыть';c.onclick=closeDialog;btns.appendChild(c);
 }
 $('dlg').addEventListener('click',e=>{if(e.target===$('dlg'))closeDialog();});
 function saveMoneyAndInv(){try{localStorage.setItem('mg_money',String(money));}catch(e){}}
-/* --- ПОГОДА: дождь (Спринт 8) --- */
+/* --- ПОГОДА: дождь --- */
 let rainOn=false,rainF=0,rainTimer=50,rainDur=0;
 const RAIN_N=IS_TOUCH?450:800;
 const rainGeo=new THREE.BufferGeometry();
@@ -1541,9 +1661,16 @@ function sellHouse(){
 const hi=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1,1,1)),new THREE.LineBasicMaterial({color:0x7ef2ff}));
 hi.visible=false;scene.add(hi);
 function nearGarage(){return Math.hypot(GARAGE.x-player.x,GARAGE.z-player.z)<3;}
+function nearBusStop(){
+ if(Math.hypot(CITY_BUS_POS.x-player.x,CITY_BUS_POS.z-player.z)<4)return CITY_BUS_POS;
+ if(Math.hypot(PORT_BUS_POS.x-player.x,PORT_BUS_POS.z-player.z)<4)return PORT_BUS_POS;
+ return null;
+}
 function contextAction(){
  heldSwing=0.3;
  if(nearGarage()){trolleyAction();return;}
+ const bs=nearBusStop();
+ if(bs){openDialog('bus');return;}
  if(nearestNPC()<3){openDialog('npc');return;}
  for(const n of neighbors){
   if(Math.hypot(n.g.position.x-player.x,n.g.position.z-player.z)<2.6){openDialog(n.dlgKey,n.name);return;}
@@ -1555,10 +1682,12 @@ function contextAction(){
   else toast('Рынок закрыт — работает с 9:00 до 15:00 🕘');
   return;
  }
+ if(Math.hypot(PORT_NPC.x-player.x,PORT_NPC.z-player.z)<3){openDialog('port');return;}
  if(jobActive){
+  const z=jobType==='port'?PORT_ZONE:ZONE;
   if(carrying||carryCount>0){
-   if(Math.hypot(ZONE.x-player.x,ZONE.z-player.z)<2.6)deliverBox();
-   else toast('Неси груз к зелёному кольцу 📦');
+   if(Math.hypot(z.x-player.x,z.z-player.z)<2.6)deliverBox();
+   else toast(jobType==='port'?'Неси груз к жёлтому кольцу причала 📦':'Неси груз к зелёному кольцу 📦');
    return;
   }
   const b=nearestJobBox();
@@ -1567,14 +1696,14 @@ function contextAction(){
     carryCount++;setCarryStack(carryCount);carryStack.visible=true;
     scene.remove(b);jobBoxes.splice(jobBoxes.indexOf(b),1);
     sfx(200,0.08,'sine',0.04);
-    toast('Загружено на тележку: '+carryCount+'/5');
+    toast('Загружено на тележку: '+carryCount+'/'+(jobType==='port'?6:5));
    }else{
     carrying=b;scene.remove(b);carryGroup.visible=true;held.visible=false;
     sfx(200,0.08,'sine',0.04);
    }
    return;
   }
-  toast('Ящики у общежития — осталось '+boxesLeft);
+  toast(jobType==='port'?'Ящики на краю причала — осталось '+boxesLeft:'Ящики у общежития — осталось '+boxesLeft);
   return;
  }
  const lt=nearestLandedTree();
@@ -1741,7 +1870,9 @@ hintEl.style.cssText='position:absolute;left:50%;bottom:92px;transform:translate
 function updateHint(){
  let t='';
  if(nearGarage())t=trolleyCarried?'Действие — убрать тележку в гараж':'Действие — взять тележку';
+ else if(nearBusStop())t='Действие — автобус №7 (проезд 20 ₽)';
  else if(nearestNPC()<3)t='Действие — поговорить с Тимофеем';
+ else if(Math.hypot(PORT_NPC.x-player.x,PORT_NPC.z-player.z)<3)t='Действие — мастер Борис (смена в порту)';
  else{
   for(const n of neighbors){
    if(Math.hypot(n.g.position.x-player.x,n.g.position.z-player.z)<2.6){t='Действие — поговорить с '+n.name;break;}
@@ -1751,13 +1882,14 @@ function updateHint(){
  if(!t&&Math.hypot(PLANT_REF().x-player.x,(PLANT_REF().z+1.5)-player.z)<3.2)t='Действие — кирпичный завод (камень → кирпич)';
  if(!t&&Math.hypot(MARKET_NPC.x-player.x,MARKET_NPC.z-player.z)<3)t=marketOpen()?'Действие — рынок Марии (дорогие цены)':'Рынок закрыт (9:00–15:00)';
  if(!t&&jobActive){
+  const z=jobType==='port'?PORT_ZONE:ZONE;
   if(carrying||carryCount>0){
    const n=carrying?1:carryCount;
-   t=Math.hypot(ZONE.x-player.x,ZONE.z-player.z)<2.6
+   t=Math.hypot(z.x-player.x,z.z-player.z)<2.6
     ?'Действие — сдать груз (+'+(n*payPerBox())+' ₽)'
-    :(carryCount>1?'Вези тележку к зелёному кольцу ('+carryCount+' ящ.)':'Неси ящик к зелёному кольцу');
+    :(carryCount>1?(jobType==='port'?'Вези тележку к жёлтому кольцу ('+carryCount+' ящ.)':'Вези тележку к зелёному кольцу ('+carryCount+' ящ.)'):(jobType==='port'?'Неси ящик к жёлтому кольцу':'Неси ящик к зелёному кольцу'));
   }else if(nearestJobBox())t='Действие — '+(trolleyCarried?'загрузить ящик на тележку':'взять ящик');
-  else t='Ящики у общежития — осталось '+boxesLeft;
+  else t=(jobType==='port'?'Ящики на краю причала':'Ящики у общежития')+' — осталось '+boxesLeft;
  }
  if(!t){
   const lt=nearestLandedTree();
@@ -1778,23 +1910,33 @@ function toggleMap(){
  if(mapOpen){drawMap();sfx(660,0.08,'sine',0.04);}
 }
 function drawMap(){
- const S=mapCv.width,R2=70;
+ const S=mapCv.width,R2=115;
  const sc=S/(2*R2);
  const px=x=>(x+R2)*sc,pz=z=>(z+R2)*sc;
  mg.fillStyle='#4a7a35';mg.fillRect(0,0,S,S);
  mg.fillStyle='#5c8a3c';
  for(let i=0;i<40;i++){mg.beginPath();mg.arc(Math.random()*S,Math.random()*S,4+Math.random()*10,0,7);mg.fill();}
- mg.fillStyle='#67a44e';
- mg.fillRect(px(-27),pz(3),16*sc,12*sc);
+ /* море */
+ mg.fillStyle='#3a7ac8';
+ mg.fillRect(px(145),pz(-15),(R2-145)*sc,120*sc);
+ /* причал */
+ mg.fillStyle='#8a6b42';
+ mg.fillRect(px(143),pz(37),70*sc,16*sc);
+ /* дорога к порту */
+ mg.fillStyle='#8a6b42';
+ mg.fillRect(px(113),pz(-10),4*sc,110*sc);
+ /* дороги города */
  mg.fillStyle='#3a3f46';
  mg.fillRect(0,pz(-3),S,6*sc);
  mg.fillRect(px(-2),pz(4),4*sc,28*sc);
+ /* грунтовки */
  mg.fillStyle='#8a6b42';
  mg.fillRect(px(-64),pz(7),18*sc,3.2*sc);
  mg.fillRect(px(-72),pz(8),3.2*sc,24*sc);
  mg.fillRect(px(55),pz(-11.5),30*sc,3.5*sc);
  mg.fillStyle='#f0f0e0';
  for(let x=-64;x<=64;x+=8)mg.fillRect(px(x),pz(-0.2),2*sc,0.4*sc);
+ /* постройки */
  mg.fillStyle='#cfd4da';mg.fillRect(px(-25),pz(-15),10*sc,8*sc);
  mg.fillStyle='#b55b3c';mg.fillRect(px(-6),pz(-15.5),12*sc,9*sc);
  mg.fillStyle='#9a5f3f';mg.fillRect(px(10),pz(-19),8*sc,5*sc);
@@ -1802,16 +1944,19 @@ function drawMap(){
  mg.fillStyle='#7a8288';mg.fillRect(px(9),pz(28),3*sc,4*sc);
  mg.fillStyle='#5a6270';mg.fillRect(px(18),pz(-4.6),4*sc,2.4*sc);
  mg.fillStyle='#7fae57';mg.fillRect(px(-6),pz(24),12*sc,12*sc);
+ mg.fillStyle='#9aa2aa';mg.fillRect(px(155),pz(52),10*sc,8*sc);
+ /* деревья */
  mg.fillStyle='#2f6b2a';
  [[30,8],[34,-6],[-30,10],[-34,-4],[26,-14],[-26,16],[-32,24],[30,26]].forEach(p=>{mg.beginPath();mg.arc(px(p[0]),pz(p[1]),3,0,7);mg.fill();});
- FOREST_SPOTS.forEach(p=>{mg.beginPath();mg.arc(px(p[0]),pz(p[1]),4,0,7);mg.fill();});
+ FOREST_SPOTS.forEach(p=>{mg.beginPath();mg.arc(px(p[0]),pz(p[1]),3,0,7);mg.fill();});
  mg.fillStyle='#8d9298';
- ROCK_SPOTS.forEach(p=>{mg.beginPath();mg.arc(px(p[0]),pz(p[1]),4,0,7);mg.fill();});
+ ROCK_SPOTS.forEach(p=>{mg.beginPath();mg.arc(px(p[0]),pz(p[1]),3,0,7);mg.fill();});
  /* палатки рынка */
  const mOpen=marketOpen();
  mg.fillStyle=mOpen?'#4a8ad8':'#6a6a6a';
  for(let i=0;i<3;i++)mg.fillRect(px(MARKET.x-4+i*4-1.3),pz(MARKET.z-0.75),2.6*sc,1.5*sc);
- mg.font='bold 10px sans-serif';mg.textAlign='center';
+ /* подписи */
+ mg.font='bold 9px sans-serif';mg.textAlign='center';
  mg.fillStyle='#fff';
  mg.fillText('МЭРИЯ · БИРЖА',px(-20),pz(-11)+3);
  mg.fillText('ОБЩЕЖИТИЕ',px(0),pz(-11)+14);
@@ -1828,13 +1973,21 @@ function drawMap(){
  mg.fillText('ГАРАЖ 🛒',px(11),pz(27)+3);
  mg.fillStyle=mOpen?'#ffe080':'#aaaaaa';
  mg.fillText('РЫНОК'+(mOpen?' 🏪':' ✕'),px(MARKET.x),pz(MARKET.z+2.6));
+ mg.fillStyle='#c8e0ff';
+ mg.fillText('ПОРТ «ВОСТОЧНЫЙ»',px(178),pz(30)+3);
+ mg.fillText('🚢',px(198),pz(45)+3);
  mg.fillStyle='#ffd86b';mg.font='bold 12px sans-serif';
  mg.fillText('ZINI CITY',px(0),pz(-26));
- mg.font='bold 9px sans-serif';mg.fillStyle='#eaffd0';
- mg.fillText('ПАРК',px(PARK.x),pz(PARK.z)+3);
+ /* автобусные остановки */
+ mg.fillStyle='#2f7ad0';
+ mg.fillRect(px(CITY_BUS_POS.x-2),pz(CITY_BUS_POS.z-1),4*sc,2*sc);
+ mg.fillStyle='#d8a02f';
+ mg.fillRect(px(PORT_BUS_POS.x-1),pz(PORT_BUS_POS.z-3),2*sc,6*sc);
+ /* машина */
  const carMx=Math.max(8,Math.min(S-8,px(carX))),carMz=pz(0);
  mg.fillStyle='#d84a3a';
  mg.fillRect(carMx-4,carMz-3,8,6);
+ /* игрок */
  const mx=Math.max(8,Math.min(S-8,px(player.x))),mz=Math.max(8,Math.min(S-8,pz(player.z)));
  mg.save();
  mg.translate(mx,mz);
@@ -1844,7 +1997,7 @@ function drawMap(){
  mg.restore();
 }
 const hadSave=loadWorld();
-if(!hadSave)toast('ZINI CITY! Тимофей — работа, рынок Марии — с 9 до 15, дождь — сам придёт 🌧');
+if(!hadSave)toast('ZINI CITY! Автобус №7 у вокзала — порт ждёт 🚌🚢');
 let lastTs=0,carHonked=false;
 function loop(ts){
  requestAnimationFrame(loop);
@@ -1856,8 +2009,9 @@ function loop(ts){
   jobTime-=dt;
   if(jobTime<=0){jobTime=0;endJob(false);}
   updateJobChip();
+  const z=jobType==='port'?portRing:zoneRing;
   const pu=1+Math.sin(ts*0.004)*0.06;
-  zoneRing.scale.set(pu,pu,1);
+  z.scale.set(pu,pu,1);
  }
  flagCloth.rotation.y=Math.sin(ts*0.002)*0.3;
  const fu=1+Math.sin(ts*0.006)*0.15;
@@ -1879,12 +2033,11 @@ function loop(ts){
   sw2.pivot.rotation.x=ang;
   if(Math.abs(ang)>0.43&&Math.abs(prev)<=0.43)creak();
  }
- /* рынок: Мария и палатки оживают/засыпают */
+ /* рынок */
  marketNpc.rotation.y=Math.atan2(player.x-MARKET_NPC.x,player.z-MARKET_NPC.z);
  marketNpc.position.y=marketOpen()?Math.abs(Math.sin(ts*0.0022))*0.02:0;
- marketStalls.forEach((g,i)=>{
-  g.position.y=marketOpen()?0:0.35;
- });
+ marketStalls.forEach(g=>{g.position.y=marketOpen()?0:0.35;});
+ /* машина */
  const ahead=carDir>0?(player.x-carX):(carX-player.x);
  const onRoad=Math.abs(player.z-0)<2.2;
  if(ahead>0&&ahead<7&&onRoad&&Math.abs(player.z-car.position.z)<3){
@@ -1903,6 +2056,11 @@ function loop(ts){
  if(Math.abs(player.z-car.position.z)<1.3&&Math.abs(player.x-carX)<2.3){
   player.z+=player.z>car.position.z?0.2:-0.2;
  }
+ /* корабль: покачивание и флаг */
+ ship.position.y=Math.sin(ts*0.0012)*0.12;
+ ship.rotation.z=Math.sin(ts*0.0009)*0.02;
+ shipFlag.rotation.y=Math.sin(ts*0.002)*0.4;
+ /* деревья */
  for(const t of chopTrees){
   if(t.falling&&!t.landed){
    t.fallP=Math.min(1,t.fallP+dt*0.8);
@@ -1929,7 +2087,12 @@ function loop(ts){
   shopNpc.rotation.y=Math.atan2(player.x-SHOP_NPC.x,player.z-SHOP_NPC.z);
   shopNpc.children[0].position.y=1.05+Math.sin(ts*0.0021)*0.012;
  }
+ if(Math.hypot(PORT_NPC.x-player.x,PORT_NPC.z-player.z)<7){
+  portNpc.rotation.y=Math.atan2(player.x-PORT_NPC.x,player.z-PORT_NPC.z);
+  portNpc.children[0].position.y=1.05+Math.sin(ts*0.0021)*0.012;
+ }
  updateNeighbors(dt,ts);
+ /* движение */
  let ix=0,iz=0;
  if(IS_TOUCH){ix=joyVec.x;iz=-joyVec.y;}
  else{
@@ -1952,7 +2115,7 @@ function loop(ts){
  const sup=supportHeight();
  if(player.y<=sup){player.y=sup;vy=0;onGround=true;}else onGround=false;
  if(keys.Space&&onGround)vy=7.2;
- player.x=Math.max(-240,Math.min(240,player.x));player.z=Math.max(-240,Math.min(240,player.z));
+ player.x=Math.max(-240,Math.min(260,player.x));player.z=Math.max(-240,Math.min(260,player.z));
  camera.position.set(player.x,player.y+EYE+Math.sin(bobT)*0.035,player.z);
  camera.rotation.order='YXZ';
  camera.rotation.set(pitch,yaw,0);
