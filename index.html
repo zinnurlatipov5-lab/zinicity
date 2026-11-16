@@ -17,6 +17,7 @@ canvas{touch-action:none;display:block}
 #cross:before,#cross:after{content:'';position:absolute;background:#fff;box-shadow:0 0 3px #000}
 #cross:before{left:8px;top:0;width:2px;height:18px}
 #cross:after{top:8px;left:0;width:18px;height:2px}
+#cross.hot:before,#cross.hot:after{background:#ff5a3a;box-shadow:0 0 5px #ff5a3a}
 #hotbar{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:6px;pointer-events:auto;max-width:96vw;overflow-x:auto}
 .hchip{background:rgba(12,22,44,.85);color:#fff;border:2px solid rgba(255,255,255,.25);border-radius:12px;padding:7px 11px;font-size:12px;font-weight:800;cursor:pointer;min-width:76px;text-align:center;flex-shrink:0}
 .hchip.on{border-color:#7ef2ff;box-shadow:0 0 12px rgba(126,242,255,.6)}
@@ -60,6 +61,7 @@ body.touch #tip{display:none}
   <div class="chip" id="moneyChip">💰 500 ₽</div>
   <div class="chip" id="dayChip">☀ 12:00</div>
   <div class="chip" id="jobChip" style="display:none">📦 0/5 · 2:00</div>
+  <div class="chip" id="ammoChip" style="display:none">🔫 0/0</div>
   <div class="chip" id="modeChip">🔨 СТРОЙКА</div>
  </div>
  <div id="cross"></div>
@@ -91,7 +93,7 @@ body.touch #tip{display:none}
 </div>
 <script>
 'use strict';
-/* ===== ZINI CITY — Спринт 11: лодка, песчаный остров, осьминог ===== */
+/* ===== ZINI CITY — Спринт 12: стрелковый полигон, пистолет, автомат ===== */
 const $=id=>document.getElementById(id);
 const IS_TOUCH=('ontouchstart' in window)||navigator.maxTouchPoints>0;
 if(IS_TOUCH)document.body.classList.add('touch');
@@ -109,13 +111,37 @@ function chopSfx(){sfx(110,0.14,'square',0.06);setTimeout(()=>sfx(70,0.16,'sine'
 function mineSfx(){sfx(180,0.08,'square',0.05);setTimeout(()=>sfx(120,0.1,'square',0.04),50);}
 function honk(){sfx(420,0.25,'square',0.06);setTimeout(()=>sfx(390,0.2,'square',0.05),260);}
 function creak(){sfx(240,0.3,'sawtooth',0.02);}
+/* звуки оружия */
+function shotSfx(smg){
+ if(smg){sfx(210,0.09,'square',0.08);setTimeout(()=>sfx(130,0.11,'sawtooth',0.05),20);}
+ else{sfx(240,0.13,'square',0.09);setTimeout(()=>sfx(110,0.18,'sawtooth',0.06),30);}
+}
+function hitTargetSfx(){sfx(980,0.09,'triangle',0.06);setTimeout(()=>sfx(1420,0.1,'triangle',0.05),60);}
+function emptySfx(){sfx(320,0.05,'square',0.04);}
+function reloadSfx(){sfx(500,0.06,'square',0.05);setTimeout(()=>sfx(380,0.07,'square',0.05),110);}
 window.addEventListener('pointerdown',()=>ac());
-/* рыбалка и лодка: состояние рано — чтобы премия мэра видела улов */
+/* рыбалка и лодка: состояние рано */
 let rodHave=localStorage.getItem('mg_rod')==='1';
 let fishN=parseInt(localStorage.getItem('mg_fish')||'0',10);
 let fishState=0,fishT=0;
 let boatHave=localStorage.getItem('mg_boat')==='1';
 let sailing=false;
+/* оружие и патроны (Спринт 12) */
+let gunHave=localStorage.getItem('mg_gun')==='1';
+let smgHave=localStorage.getItem('mg_smg')==='1';
+let ammoP=parseInt(localStorage.getItem('mg_ammoP')||'0',10);
+let ammoS=parseInt(localStorage.getItem('mg_ammoS')||'0',10);
+function saveAmmo(){
+ localStorage.setItem('mg_ammoP',String(ammoP));
+ localStorage.setItem('mg_ammoS',String(ammoS));
+}
+function updAmmoChip(){
+ const on=gunHave||smgHave;
+ $('ammoChip').style.display=on?'':'none';
+ if(!on)return;
+ if(smgHave)$('ammoChip').textContent='🔫 АВТОМАТ '+ammoS;
+ else $('ammoChip').textContent='🔫 ПИСТОЛЕТ '+ammoP;
+}
 let money=parseInt(localStorage.getItem('mg_money')||'500',10);
 function setMoney(v){
  money=v;localStorage.setItem('mg_money',String(v));
@@ -440,6 +466,18 @@ const crateTex=makeTex(128,(g,s)=>{
  g.beginPath();g.moveTo(8,8);g.lineTo(s-8,s-8);g.moveTo(s-8,8);g.lineTo(8,s-8);g.stroke();
  noise(g,s,120,0.12);
 });
+/* мишень: круги на доске */
+const targetTex=makeTex(256,(g,s)=>{
+ g.fillStyle='#f0e8d8';g.fillRect(0,0,s,s);
+ const rings=[['#d84a3a',0.42],['#f0f0e0',0.34],['#d84a3a',0.24],['#f0f0e0',0.16],['#d8b02a',0.09]];
+ rings.forEach(r=>{
+  g.fillStyle=r[0];
+  g.beginPath();g.arc(s/2,s/2,s*r[1],0,7);g.fill();
+ });
+ g.fillStyle='#201018';
+ g.beginPath();g.arc(s/2,s/2,s*0.035,0,7);g.fill();
+ noise(g,s,140,0.08);
+});
 const boardFaceMats=Array.from({length:4},()=>new THREE.MeshStandardMaterial({map:plankFaceMake(),bumpMap:plankBump,bumpScale:0.04,roughness:0.85}));
 const boardSideMat=new THREE.MeshStandardMaterial({map:plankSideTex,bumpMap:plankBump,bumpScale:0.03,roughness:0.9});
 const boardEndMat=new THREE.MeshStandardMaterial({map:endGrainTex,roughness:0.95});
@@ -459,7 +497,9 @@ const PIECES={
  stone:{n:'Камень',ui:'#8d9298',buy:[10,30],sell:2,mat:stoneBuildMat},
  sand:{n:'Песок',ui:'#e8d8a0',sell:4},
  axe:{n:'Топор',ui:'#c0c8d0',tool:true},
- pick:{n:'Кирка',ui:'#b8a888',tool:true}
+ pick:{n:'Кирка',ui:'#b8a888',tool:true},
+ gun:{n:'Пистолет',ui:'#d8c060',tool:true},
+ smg:{n:'Автомат',ui:'#e07a1f',tool:true}
 };
 const PIECE_KEYS=Object.keys(PIECES);
 let inv={brick:200,board:40,glass:8,axe:1,pick:1,stone:0,sand:0};
@@ -490,6 +530,7 @@ dirt(-74,8.5,3.2,18);dirt(-82,20,3.2,24);
 dirt(70,-10,3.5,30);
 dirt(115,45,4,110);
 dirt(198,-24,3,20);dirt(202,-12,4,14);
+dirt(96,-9,3.2,16);
 const geoCache={};
 function roundedBox(w,h,d,r){
  const k=w+'_'+h+'_'+d+'_'+r;
@@ -600,6 +641,7 @@ function lamp(x,z,withLight){
 lamp(3.5,-4.5,true);lamp(-3.5,6,false);lamp(3.5,18,true);lamp(-3.5,24,false);
 lamp(7.5,24,true);
 lamp(150,40,true);lamp(190,52,true);
+lamp(88,-12,true);
 const plot=new THREE.Mesh(new THREE.PlaneGeometry(12,12),matOf(0x7fae57));
 plot.rotation.x=-Math.PI/2;plot.position.set(0,0.02,30);plot.receiveShadow=true;plot.userData.plot=true;scene.add(plot);pickables.push(plot);
 function fenceLine(x1,z1,x2,z2){
@@ -664,6 +706,7 @@ sign('МЭРИЯ',-20,5.6,-11);sign('ОБЩЕЖИТИЕ',0,6.2,-11);sign('АВТ
 sign('ZINI CITY',0,7.4,-24);
 sign('ЛЕС · ЛЕСОРУБКА',-88,3.4,2,0.7);
 sign('КАРЬЕРА',82,2.4,-10,0.7);
+sign2('ПОЛИГОН',94,3.4,-14,0.66);
 sign2('КИРПИЧНЫЙ ЗАВОД',14,4.6,-15.5,0.62);
 sign2('СТРОЙМАТЕРИАЛЫ',27,3.7,-3.6,0.6);
 sign2('СДАЧА ДОМА',0,2.5,33,0.56);
@@ -746,7 +789,7 @@ function addNeighbor(name,a,b,speed,o,dlgKey){
  sign(name.toUpperCase(),a.x,2.4,a.z,0.5);
 }
 addNeighbor('Анна',{x:-10,z:26},{x:-4.5,z:28.5},0.6,{shirt:0xd06aa8,pants:0x8a3a66,hair:0x8a5a2a,bow:0xffd0e0},'anna');
-addNeighbor('Пётр',{x:6,z:33},{x:9,z:28.5},0.5,{shirt:0x4a8a4a,pants:0x3a4a3a,hat:0x2a6a3a,hair:0x4a4a4a},'petr');
+addNeighbor('Пётr',{x:6,z:33},{x:9,z:28.5},0.5,{shirt:0x4a8a4a,pants:0x3a4a3a,hat:0x2a6a3a,hair:0x4a4a4a},'petr');
 function updateNeighbors(dt,ts){
  for(const n of neighbors){
   const near=Math.hypot(n.g.position.x-player.x,n.g.position.z-player.z);
@@ -1162,6 +1205,49 @@ const octo=(function(){
  g.traverse(o=>{if(o.isMesh)o.castShadow=true;});
  scene.add(g);return g;
 })();
+/* ===== СПРИНТ 12: СТРЕЛКОВЫЙ ПОЛИГОН ===== */
+const RANGE=new THREE.Vector3(100,0,-16);
+(function(){
+ /* земля тира */
+ const ground=new THREE.Mesh(new THREE.PlaneGeometry(22,30),matOf(0x9a8a60));
+ ground.rotation.x=-Math.PI/2;ground.position.set(RANGE.x,0.02,RANGE.z);
+ ground.receiveShadow=true;ground.userData.ground=true;scene.add(ground);
+ /* задний вал */
+ addSolidBoxY(RANGE.x,1.5,RANGE.z-13,24,3,1.4,0x6a5a40,0.3);
+ /* боковые стены */
+ addSolidBoxY(RANGE.x-10,1.5,RANGE.z-2,1.2,3,24,0x6a5a40,0.3);
+ addSolidBoxY(RANGE.x+10,1.5,RANGE.z-2,1.2,3,24,0x6a5a40,0.3);
+ /* навес над огневой линией */
+ addSolidBoxY(RANGE.x,3.2,RANGE.z+4,20,0.4,5,0x4a5a6a,0.2);
+ [-8,0,8].forEach(px=>{
+  const post=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.16,3.2,8),matOf(0x5a4a30));
+  post.position.set(RANGE.x+px,1.6,RANGE.z+6);post.castShadow=true;scene.add(post);
+  solids.push({minX:RANGE.x+px-0.2,maxX:RANGE.x+px+0.2,minY:0,maxY:3.2,minZ:RANGE.z+5.8,maxZ:RANGE.z+6.2});
+ });
+ /* стол стрельбы */
+ addSolidBoxY(RANGE.x-1,0.5,RANGE.z+5,3,1,0.7,0x7a5a34,0.1);
+ /* мишени */
+})();
+const RANGE_TARGETS=[];
+[[RANGE.x-7,RANGE.z-10],[RANGE.x-3.5,RANGE.z-10],[RANGE.x,RANGE.z-10],[RANGE.x+3.5,RANGE.z-10],[RANGE.x+7,RANGE.z-10]].forEach((p,i)=>{
+ const g=new THREE.Group();
+ const stand=new THREE.Mesh(new THREE.BoxGeometry(0.12,1.4,0.12),matOf(0x5a4a30));
+ stand.position.y=0.7;g.add(stand);
+ const board=new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.55,0.06,20),new THREE.MeshStandardMaterial({map:targetTex,roughness:0.9}));
+ board.rotation.x=Math.PI/2;
+ board.position.set(0,1.6,0);
+ board.castShadow=true;g.add(board);
+ g.position.set(p[0],0,p[1]);
+ scene.add(g);
+ solids.push({minX:p[0]-0.6,maxX:p[0]+0.6,minY:0,maxY:2.2,minZ:p[1]-0.35,maxZ:p[1]+0.35});
+ RANGE_TARGETS.push({g,board,x:p[0],z:p[1],down:false,timer:0});
+});
+/* мастер Сергей */
+const SERGEY=new THREE.Vector3(RANGE.x-2,0,RANGE.z+7.5);
+const sergeyNpc=makePerson({shirt:0x3a7a3a,pants:0x2a3a2a,hat:0x2a5a2a,hair:0x6a5a4a});
+sergeyNpc.position.copy(SERGEY);scene.add(sergeyNpc);
+solids.push({minX:SERGEY.x-0.4,maxX:SERGEY.x+0.4,minY:0,maxY:1.9,minZ:SERGEY.z-0.4,maxZ:SERGEY.z+0.4});
+sign('СЕРГЕЙ · МАСТЕР ПОЛИГОНА',SERGEY.x,2.5,SERGEY.z,0.6);
 /* ===== АВТОМАШИНА ===== */
 const car=new THREE.Group();
 const carHeadMats=[],carTailMats=[];
@@ -1295,6 +1381,7 @@ function tryMine(){
 }
 const qY90=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),Math.PI/2);
 const qZ90=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI/2);
+const windowFrameMat=new THREE.MeshStandardMaterial({map:frameTex,bumpMap:frameBump,bumpScale:0.02,roughness:0.8});
 function makeBrick(){
  const m=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.14,0.25),brickMatsArr());
  m.castShadow=true;m.receiveShadow=true;return m;
@@ -1315,18 +1402,17 @@ function makeWindow(){
  const g=new THREE.Group();
  const W=1.4,H=1.4,T=0.12,t=0.09;
  const paneMat=new THREE.MeshStandardMaterial({color:0xd6ecf7,map:glassStreak,roughness:0.08,metalness:0.15,transparent:true,opacity:0.42,side:THREE.DoubleSide});
- const top=new THREE.Mesh(new THREE.BoxGeometry(W,t,T),PIECES.glass.frameMat);top.position.y=H/2-t/2;g.add(top);
+ const top=new THREE.Mesh(new THREE.BoxGeometry(W,t,T),windowFrameMat);top.position.y=H/2-t/2;g.add(top);
  const bot=top.clone();bot.position.y=-H/2+t/2;g.add(bot);
- const lft=new THREE.Mesh(new THREE.BoxGeometry(t,H-2*t,T),PIECES.glass.frameMat);lft.position.x=-W/2+t/2;g.add(lft);
+ const lft=new THREE.Mesh(new THREE.BoxGeometry(t,H-2*t,T),windowFrameMat);lft.position.x=-W/2+t/2;g.add(lft);
  const rgt=lft.clone();rgt.position.x=W/2-t/2;g.add(rgt);
- const mid=new THREE.Mesh(new THREE.BoxGeometry(W-2*t,0.07,T),PIECES.glass.frameMat);g.add(mid);
+ const mid=new THREE.Mesh(new THREE.BoxGeometry(W-2*t,0.07,T),windowFrameMat);g.add(mid);
  const pane=new THREE.Mesh(new THREE.PlaneGeometry(W-2*t,H-2*t),paneMat);
  pane.position.z=0.02;g.add(pane);
  const pane2=pane.clone();pane2.position.z=-0.02;pane2.rotation.y=Math.PI;g.add(pane2);
  g.traverse(o=>{if(o.isMesh)o.castShadow=true;});
  return g;
 }
-PIECES.glass.frameMat=new THREE.MeshStandardMaterial({map:frameTex,bumpMap:frameBump,bumpScale:0.02,roughness:0.8});
 function orientFor(n,mk,rot){
  const q=new THREE.Quaternion();
  let dims,halfY;
@@ -1490,7 +1576,9 @@ addEventListener('mousemove',e=>{
  yaw-=e.movementX*0.0022;pitch-=e.movementY*0.0022;
  pitch=Math.max(-1.45,Math.min(1.45,pitch));
 });
-addEventListener('mousedown',e=>{if(locked&&e.button===0)contextAction();});
+let mouseHeld=false,touchFireHeld=false;
+addEventListener('mousedown',e=>{if(locked&&e.button===0){mouseHeld=true;contextAction();}});
+addEventListener('mouseup',()=>{mouseHeld=false;});
 addEventListener('contextmenu',e=>e.preventDefault());
 let joyPid=null,joyCx=0,joyCy=0;const joyVec={x:0,y:0};
 let lookPid=null,lookLast=null,lookMoved=0,lookT0=0;
@@ -1515,7 +1603,7 @@ function joyEnd(){
 renderer.domElement.addEventListener('pointerdown',e=>{
  if(dlgOpen||mapOpen)return;
  if(e.clientX<innerWidth*0.45&&joyPid===null){joyStart(e);}
- else if(lookPid===null){lookPid=e.pointerId;lookLast={x:e.clientX,y:e.clientY};lookMoved=0;lookT0=performance.now();}
+ else if(lookPid===null){lookPid=e.pointerId;lookLast={x:e.clientX,y:e.clientY};lookMoved=0;lookT0=performance.now();touchFireHeld=true;}
  e.preventDefault();
 },{passive:false});
 renderer.domElement.addEventListener('pointermove',e=>{
@@ -1537,6 +1625,7 @@ function ptrEnd(e){
  if(e.pointerId===joyPid)joyEnd();
  if(e.pointerId===lookPid){
   if(lookMoved<14&&performance.now()-lookT0<350)contextAction();
+  touchFireHeld=false;
   lookPid=null;
  }
 }
@@ -1544,7 +1633,8 @@ renderer.domElement.addEventListener('pointerup',ptrEnd,{passive:false});
 renderer.domElement.addEventListener('pointercancel',ptrEnd,{passive:false});
 function bindBtn(id,fn){
  const el=$(id);
- el.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();if(!dlgOpen&&!mapOpen)fn();},{passive:false});
+ el.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();if(!dlgOpen&&!mapOpen){fn();}});
+ el.addEventListener('pointerup',()=>{if(id==='actBtn')touchFireHeld=false;});
 }
 bindBtn('jumpBtn',()=>{if(onGround)vy=7.2;});
 bindBtn('modeBtn',toggleMode);
@@ -1560,15 +1650,17 @@ function toggleMode(){
  sfx(mode==='build'?520:300,0.08,'sine',0.04);
 }
 function rotatePiece(){
- if(selMat==='axe'||selMat==='pick')toast('Инструмент не крутится 🙂');
+ if(selMat==='axe'||selMat==='pick'||selMat==='gun'||selMat==='smg')toast('Это не крутится 🙂');
  else if(selMat==='board'){rotState.board=1-rotState.board;toast('Доска: '+(rotState.board?'стоя (2 м в высоту)':'лежит (2 м в длину)'));}
  else if(selMat==='brick'){rotState.brick=1-rotState.brick;toast('Кирпич: '+(rotState.brick?'поперёк':'вдоль'));}
  else toast('Это деталь ставится как есть 🙂');
  sfx(700,0.05,'sine',0.03);
 }
 function selectMat(k){
+ if(k==='gun'&&!gunHave){toast('Пистолет выдаёт мастер Сергей на полигоне 🔫');return;}
+ if(k==='smg'&&!smgHave){toast('Автомат продаёт мастер Сергей за 1200 ₽');return;}
  if(!PIECES[k].tool&&!inv[k]){toast(PIECES[k].n+' закончился — купи у Валентины или добудь');return;}
- selMat=k;updateHeld();UIC();sfx(700,0.05,'sine',0.03);
+ selMat=k;updateHeld();UIC();updAmmoChip();sfx(700,0.05,'sine',0.03);
 }
 function UIC(){
  $('hotbar').innerHTML=PIECE_KEYS.map(k=>'<div class="hchip'+(k===selMat?' on':'')+'" data-k="'+k+'"><span class="sw" style="background:'+PIECES[k].ui+'"></span>'+PIECES[k].n+'<small>'+(PIECES[k].tool?'∞':'×'+inv[k])+'</small></div>').join('');
@@ -1583,7 +1675,6 @@ function dayF(){
  const h=Math.sin(dayT*Math.PI*2);
  return THREE.MathUtils.clamp(h*1.6+0.1,0,1);
 }
-/* городская смена: 30/45 (+10 в дождь), портовая всегда 50 */
 function payPerBox(){
  if(jobType==='port')return 50;
  const base=dayF()<0.4?45:30;
@@ -1639,7 +1730,7 @@ function openDialog(mode,who){
  dlgMode=mode;dlgWho=who||null;
  dlgOpen=true;
  $('dlg').style.display='flex';
- const names={npc:'БИРЖА ТРУДА · Тимофей',shop:'СТРОЙМАТЕРИАЛЫ · Валентина',anna:'СОСЕДКА · Анна',petr:'СОСЕД · Пётр',market:'РЫНОК · МАРИЯ',port:'ПОРТ · МАСТЕР БОРИС',bus:'АВТОБУС №7',fedor:'МАЯК · РЫБАК ФЁДОР',plant:'КИРПИЧНЫЙ ЗАВОД ZINI BRICK'};
+ const names={npc:'БИРЖА ТРУДА · Тимофей',shop:'СТРОЙМАТЕРИАЛЫ · Валентина',anna:'СОСЕДКА · Анна',petr:'СОСЕД · Пётр',market:'РЫНОК · МАРИЯ',port:'ПОРТ · МАСТЕР БОРИС',bus:'АВТОБУС №7',fedor:'МАЯК · РЫБАК ФЁДОР',plant:'КИРПИЧНЫЙ ЗАВОД ZINI BRICK',sergey:'ПОЛИГОН · МАСТЕР СЕРГЕЙ'};
  $('dlgName').textContent=who||names[mode]||'ZINI CITY';
  renderDialog();
  if(document.pointerLockElement)document.exitPointerLock();
@@ -1669,6 +1760,39 @@ function renderDialog(){
   b.disabled=money<20;
   b.onclick=()=>busRide(toPort);
   btns.appendChild(b);
+ }else if(dlgMode==='sergey'){
+  $('dlgText').textContent='Сергей: Добро пожаловать на полигон, '+NICK+'! Правила простые: пистолет — за глаз, патроны — в стол, мишени — вверх. Центр «яблочко» даёт 5 очков, дальше меньше. За каждое очко — 2 ₽. Стреляй по кнопке Действия, автомат — зажми!';
+  if(!gunHave){
+   const b=document.createElement('button');b.className='dbtn good';b.textContent='Получить пистолет (бесплатно)';
+   b.onclick=()=>{
+    gunHave=true;localStorage.setItem('mg_gun','1');
+    ammoP+=12;saveAmmo();
+    magP=12;updAmmoChip();coin();closeDialog();
+    toast('Пистолет у тебя! 12 патронов в подарок 🔫');
+   };
+   btns.appendChild(b);
+  }
+  if(!smgHave){
+   const s=document.createElement('button');s.className='dbtn';s.textContent='Купить автомат (1200 ₽) — 30 патронов в подарок';
+   s.disabled=money<1200;
+   s.onclick=()=>{
+    setMoney(money-1200);smgHave=true;localStorage.setItem('mg_smg','1');
+    ammoS+=30;saveAmmo();magS=30;
+    updAmmoChip();coin();closeDialog();
+    toast('Автомат твой! Зажми «Действие» — очередь 🔫🔫🔫');
+   };
+   btns.appendChild(s);
+  }
+  const ap=document.createElement('button');ap.className='dbtn';
+  ap.textContent='Патроны к пистолету ×12 — 30 ₽ (у тебя: '+ammoP+')';
+  ap.disabled=money<30;
+  ap.onclick=()=>{setMoney(money-30);ammoP+=12;saveAmmo();updAmmoChip();coin();toast('+12 патронов к пистолету');renderDialog();};
+  btns.appendChild(ap);
+  const as2=document.createElement('button');as2.className='dbtn';
+  as2.textContent='Патроны к автомату ×30 — 60 ₽ (у тебя: '+ammoS+')';
+  as2.disabled=money<60;
+  as2.onclick=()=>{setMoney(money-60);ammoS+=30;saveAmmo();updAmmoChip();coin();toast('+30 патронов к автомату');renderDialog();};
+  btns.appendChild(as2);
  }else if(dlgMode==='fedor'){
   $('dlgText').textContent='Фёдор: Здорово, '+NICK+'! Это мой маяк — город за присмотр платит, а я тебя научу рыбачить. Удочка моя, пользуйся. Клюёт у мыска: забросил — ждёшь — как рванёт, подсекай!';
   if(!rodHave){
@@ -1706,7 +1830,7 @@ function renderDialog(){
   const gift=localStorage.getItem(dlgMode==='anna'?'mg_gift_anna':'mg_gift_petr');
   const line=dlgMode==='anna'
    ?('Привет, '+NICK+'! Ты новосёл с этого участка? Какой простор! Держи на новоселье монету — и заходи в парк, там качели и фонтан 🙂')
-   :('О, сосед! Слышал, у Бориса лодку купил? На песчаном острове песок копают — Мария его дорого берёт. И осьминога там видели, фиолетового!');
+   :('О, сосед! На полигоне у Сергея теперь стреляют — гремит на весь карьер. Говорят, за очки платят честно. И лодку у Бориса посмотри — остров песчаный манит!');
   $('dlgText').textContent=line;
   if(!gift){
    const b=document.createElement('button');b.className='dbtn';
@@ -1752,7 +1876,7 @@ function renderDialog(){
   $('dlgText').textContent='Смена идёт! Осталось ящиков: '+boxesLeft+(trolleyCarried?' — с тележкой грузи все разом!':'. Носи по одному или возьми тележку в гараже.');
   const b=document.createElement('button');b.className='dbtn alt';b.textContent='Завершить смену досрочно';b.onclick=()=>{closeDialog();endJob(false);};btns.appendChild(b);
  }else{
-  $('dlgText').textContent='Здравствуй, '+NICK+'! Смена грузчика: 5 ящиков — 30 ₽ (ночью 45 ₽, в дождь +10 ₽), бонус 50 ₽. В порту — 50 ₽ за ящик. На лодке — на остров за песком!';
+  $('dlgText').textContent='Здравствуй, '+NICK+'! Смена грузчика: 5 ящиков — 30 ₽ (ночью 45 ₽, в дождь +10 ₽), бонус 50 ₽. В порту — 50 ₽ за ящик. На полигоне за очки платят, на острове песок продают!';
   const b=document.createElement('button');b.className='dbtn';b.textContent='Устроиться на смену ('+payPerBox()+' ₽/ящик)';b.onclick=()=>{closeDialog();startJob();};btns.appendChild(b);
  }
  const c=document.createElement('button');c.className='dbtn alt';c.textContent='Закрыть';c.onclick=closeDialog;btns.appendChild(c);
@@ -1870,6 +1994,73 @@ function catchOcto(){
  setMoney(money+150);coin();
  toast('Осьминог пойман! Борис дал 150 ₽ 🐙');
 }
+/* --- СТРЕЛЬБА (Спринт 12) --- */
+const GUN_MAG=12,SMG_MAG=30;
+let magP=parseInt(localStorage.getItem('mg_magP')||'12',10);
+let magS=parseInt(localStorage.getItem('mg_magS')||'0',10);
+let reloading=false,reloadT=0;
+function saveMags(){
+ localStorage.setItem('mg_magP',String(magP));
+ localStorage.setItem('mg_magS',String(magS));
+}
+let rangeScore=parseInt(localStorage.getItem('mg_score')||'0',10);
+const casings=[];
+function spawnCasing(){
+ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.015,0.05,6),matOf(0xd8b02a));
+ const wp=new THREE.Vector3();
+ held.getWorldPosition(wp);
+ c.position.copy(wp);
+ c.userData.v=new THREE.Vector3(Math.cos(yaw)*2+(Math.random()-0.5),2.2+Math.random(),Math.sin(yaw)*2+(Math.random()-0.5));
+ c.userData.life=1.2;
+ scene.add(c);casings.push(c);
+}
+function fireGun(){
+ const isSmg=selMat==='smg';
+ const mag=isSmg?magS:magP,ammo=isSmg?ammoS:ammoP;
+ if(!isSmg&&mag<=0&&ammo<=0){emptySfx();toast('Патроны кончились — Сергей продаёт');return;}
+ if(reloading)return;
+ if(mag<=0){
+  reloading=true;reloadT=isSmg?1.6:1.2;
+  reloadSfx();return;
+ }
+ if(isSmg)magS--;else magP--;
+ saveMags();updAmmoChip();
+ shotSfx(isSmg);
+ spawnCasing();
+ heldSwing=0.3;
+ pitch+=isSmg?0.02:0.035;
+ const dir=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+ ray.setFromCamera(V2,camera);
+ ray.far=90;
+ const tHits=ray.intersectObjects(RANGE_TARGETS.filter(t=>!t.down).map(t=>t.board),false);
+ let scored=0,desc='';
+ if(tHits.length&&tHits[0].distance<90){
+  const t=RANGE_TARGETS.find(x=>x.board===tHits[0].object);
+  const lp=tHits[0].point;
+  const dist=Math.hypot(lp.x-t.x,lp.y-1.6);
+  if(dist<0.08){scored=5;desc='ЯБЛОЧКО! 5 очков';}
+  else if(dist<0.17){scored=4;desc='4 очка';}
+  else if(dist<0.28){scored=3;desc='3 очка';}
+  else if(dist<0.42){scored=2;desc='2 очка';}
+  else if(dist<0.55){scored=1;desc='1 очко';}
+  else{desc='В край — мимо 😐';}
+  if(scored>0){
+   rangeScore+=scored;localStorage.setItem('mg_score',String(rangeScore));
+   setMoney(money+scored*2);
+   hitTargetSfx();
+   t.down=true;t.timer=2.5;
+   toast(desc+' → +'+(scored*2)+' ₽ (всего очков: '+rangeScore+')');
+  }else{
+   sfx(160,0.08,'square',0.04);
+   toast(desc);
+  }
+ }else{
+  const wallHits=ray.intersectObjects(statics,false);
+  sfx(150,0.06,'square',0.03);
+ }
+ ray.far=7;
+}
+setInterval(saveMags,5000);
 function houseAppraisal(){
  let total=0,count=0;
  for(const p of pieces){
@@ -1909,12 +2100,15 @@ function contextAction(){
   toast('К берегу — выйти можно у причала или на острове');
   return;
  }
+ if(selMat==='gun'){fireGun();return;}
+ if(selMat==='smg'){fireGun();return;}
  if(nearGarage()){trolleyAction();return;}
  const bs=nearBusStop();
  if(bs){openDialog('bus');return;}
  if(nearBoat()){toggleBoat();return;}
  if(nearSandMound()){digSand();return;}
  if(nearOcto()){catchOcto();return;}
+ if(Math.hypot(SERGEY.x-player.x,SERGEY.z-player.z)<3){openDialog('sergey');return;}
  if(nearestNPC()<3){openDialog('npc');return;}
  for(const n of neighbors){
   if(Math.hypot(n.g.position.x-player.x,n.g.position.z-player.z)<2.6){openDialog(n.dlgKey,n.name);return;}
@@ -1937,7 +2131,7 @@ function contextAction(){
   const z=jobType==='port'?PORT_ZONE:ZONE;
   if(carrying||carryCount>0){
    if(Math.hypot(z.x-player.x,z.z-player.z)<2.6)deliverBox();
-   else toast(jobType==='port'?'Неси груз к жёлтому кольцу причала 📦':'Неси груз к зелёному кольцу 📦');
+   else toast(jobType==='port'?'Неси груз к жёлтому кольцу причала 📦':'Неси груз в руки к зелёному кольцу 📦');
    return;
   }
   const b=nearestJobBox();
@@ -1953,7 +2147,7 @@ function contextAction(){
    }
    return;
   }
-  toast(jobType==='port'?'Ящики на краю причала — осталось '+boxesLeft:'Ящики у общежития — осталось '+boxesLeft);
+  toast(jobType==='port'?'Ящики на краю причла — осталось '+boxesLeft:'Ящики у общежития — осталось '+boxesLeft);
   return;
  }
  const lt=nearestLandedTree();
@@ -1984,7 +2178,7 @@ function nearestJobBox(){
  return best;
 }
 function placePiece(){
- if(selMat==='axe'||selMat==='pick'){toast('Инструментом не строят — выбери материал');return;}
+ if(selMat==='axe'||selMat==='pick'||selMat==='gun'||selMat==='smg'){toast('Это не строительный инструмент');return;}
  if(sailing){toast('Строить с лодки нельзя');return;}
  if(trolleyCarried||carrying){toast('Руки заняты тележкой/ящиком!');return;}
  const c=computePlacement();
@@ -1995,7 +2189,7 @@ function placePiece(){
  thunk();UIC();
 }
 function breakPiece(){
- if(selMat==='axe'||selMat==='pick'){toast('Инструментом можно добывать только природное');return;}
+ if(selMat==='axe'||selMat==='pick'||selMat==='gun'||selMat==='smg'){toast('Это не строительный инструмент');return;}
  if(sailing){toast('Ломать с лодки нельзя');return;}
  if(trolleyCarried||carrying){toast('Руки заняты!');return;}
  ray.setFromCamera(V2,camera);
@@ -2019,7 +2213,18 @@ function updateHighlight(dt){
  hlT=0.12;
  Object.keys(ghost).forEach(k=>ghost[k].visible=false);
  hi.visible=false;
+ $('cross').classList.toggle('hot',(selMat==='gun'||selMat==='smg')&&!reloading&&(selMat==='smg'?magS:magP)>0);
  if(sailing||carrying||carryCount>0||jobActive||trolleyCarried)return;
+ if((selMat==='gun'||selMat==='smg')){
+  ray.setFromCamera(V2,camera);
+  const hits=ray.intersectObjects(RANGE_TARGETS.filter(t=>!t.down).map(t=>t.board),false);
+  if(hits.length&&hits[0].distance<90){
+   const b3=new THREE.Box3().setFromObject(hits[0].object);
+   const sz=b3.getSize(new THREE.Vector3()),ct=b3.getCenter(new THREE.Vector3());
+   hi.position.copy(ct);hi.scale.set(sz.x+0.04,sz.y+0.04,sz.z+0.04);hi.visible=true;
+  }
+  return;
+ }
  if((selMat==='axe'||selMat==='pick')&&mode==='build'){
   const target=selMat==='axe'?chopTrees.filter(t=>!t.falling).map(t=>t.trunk):rocks.map(r=>r.m);
   const prop=selMat==='axe'?'chop':'rock';
@@ -2111,6 +2316,29 @@ function makePaddleMesh(){
  g.traverse(o=>{if(o.isMesh)o.castShadow=false;});
  return g;
 }
+function makeGunMesh(smg){
+ const g=new THREE.Group();
+ const slide=matOf(smg?0x3a3a42:0x4a4a52);
+ const body=new THREE.Mesh(roundedBox(smg?0.34:0.2,0.09,smg?0.5:0.24,0.03),slide);
+ body.position.set(0,0.04,-0.24);g.add(body);
+ const grip=new THREE.Mesh(roundedBox(0.07,0.16,0.08,0.02),matOf(0x6a4a2a));
+ grip.position.set(0,-0.09,-0.12);grip.rotation.x=-0.35;g.add(grip);
+ const barrel=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,smg?0.3:0.12,8),matOf(0x2a2a30));
+ barrel.rotation.x=Math.PI/2;barrel.position.set(0,0.05,-(smg?0.6:0.38));g.add(barrel);
+ if(smg){
+  const magw=new THREE.Mesh(roundedBox(0.05,0.18,0.07,0.02),matOf(0x2a2a30));
+  magw.position.set(0,-0.14,-0.3);g.add(magw);
+  const stock=new THREE.Mesh(roundedBox(0.05,0.08,0.24,0.02),matOf(0x6a4a2a));
+  stock.position.set(0,0.02,0.08);g.add(stock);
+  const fm=new THREE.Mesh(new THREE.BoxGeometry(0.02,0.05,0.02),matOf(0xffe080));
+  fm.position.set(0,0.1,-0.58);g.add(fm);
+ }else{
+  const sight=new THREE.Mesh(new THREE.BoxGeometry(0.02,0.04,0.02),matOf(0xffe080));
+  sight.position.set(0,0.1,-0.34);g.add(sight);
+ }
+ g.traverse(o=>{if(o.isMesh)o.castShadow=false;});
+ return g;
+}
 const held=new THREE.Group();
 const heldBrick=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.09,0.16),brickMatsArr());
 const heldBoard=new THREE.Mesh(new THREE.BoxGeometry(0.55,0.055,0.1),boardFaceMats[0]);
@@ -2120,27 +2348,32 @@ const heldAxe=makeToolMesh('axe');
 const heldPick=makeToolMesh('pick');
 const heldStone=makeStone();heldStone.scale.setScalar(0.55);heldStone.castShadow=false;
 const heldSand=makeSand();heldSand.scale.setScalar(0.9);heldSand.castShadow=false;
+const heldGun=makeGunMesh(false);
+const heldSmg=makeGunMesh(true);
 const heldTrolley=makeTrolleyMesh();
 heldTrolley.scale.setScalar(0.85);
 heldTrolley.traverse(o=>{if(o.isMesh)o.castShadow=false;});
 const heldRod=makeRodMesh();
 const heldPaddle=makePaddleMesh();
-held.add(heldBrick,heldBoard,heldWindow,heldAxe,heldPick,heldStone,heldSand,heldTrolley,heldRod,heldPaddle);
+held.add(heldBrick,heldBoard,heldWindow,heldAxe,heldPick,heldStone,heldSand,heldGun,heldSmg,heldTrolley,heldRod,heldPaddle);
 held.position.set(0.32,-0.36,-0.62);
 held.rotation.set(0.2,-0.4,0.08);
 camera.add(held);
 let heldSwing=0;
 function updateHeld(){
  const noHand=trolleyCarried||sailing;
- heldBrick.visible=selMat==='brick'&&!noHand;
+ const isGun=selMat==='gun',isSmg=selMat==='smg';
+ heldBrick.visible=selMat==='brick'&&!noHand&&!isGun&&!isSmg;
  heldBoard.visible=selMat==='board'&&!noHand;
  heldWindow.visible=selMat==='glass'&&!noHand;
  heldAxe.visible=selMat==='axe'&&!noHand;
  heldPick.visible=selMat==='pick'&&!noHand;
  heldStone.visible=selMat==='stone'&&!noHand;
  heldSand.visible=selMat==='sand'&&!noHand;
+ heldGun.visible=isGun&&!noHand;
+ heldSmg.visible=isSmg&&!noHand;
  heldTrolley.visible=trolleyCarried;
- heldRod.visible=rodHave&&!trolleyCarried&&!sailing&&(nearFish()||fishState>0);
+ heldRod.visible=rodHave&&!trolleyCarried&&!sailing&&!isGun&&!isSmg&&(nearFish()||fishState>0);
  heldPaddle.visible=sailing;
 }
 updateHeld();
@@ -2155,9 +2388,12 @@ function updateHint(){
   else if(nearOcto())ts2='Действие — поймать осьминога (+150 ₽) 🐙';
   hintEl.style.display='block';hintEl.textContent=ts2;return;
  }
- if(nearGarage())t=trolleyCarried?'Действие — убрать тележку в гараж':'Действие — взять тележку';
+ if(selMat==='gun')t= reloading?'Перезарядка…':'Действие/клик — выстрел 🔫 (в магазине: '+magP+')';
+ else if(selMat==='smg')t= reloading?'Перезарядка…':'Действие/клик — огонь очередями 🔫 (в магазине: '+magS+')';
+ else if(nearGarage())t=trolleyCarried?'Действие — убрать тележку в гараж':'Действие — взять тележку';
  else if(nearBusStop())t='Действие — автобус №7 (проезд 20 ₽)';
  else if(nearBoat())t=boatHave?'Действие — сесть в лодку':'Лодку продаёт Борис в порту (800 ₽)';
+ else if(Math.hypot(SERGEY.x-player.x,SERGEY.z-player.z)<3)t='Действие — мастер Сергей (оружие и патроны)';
  else if(nearestNPC()<3)t='Действие — поговорить с Тимофеем';
  else if(Math.hypot(PORT_NPC.x-player.x,PORT_NPC.z-player.z)<3)t='Действие — мастер Борис (смена, лодка)';
  else if(Math.hypot(FEDOR.x-player.x,FEDOR.z-player.z)<3)t='Действие — рыбак Фёдор (удочка, скупка рыбы)';
@@ -2170,7 +2406,7 @@ function updateHint(){
  if(!t&&Math.hypot(PLANT_REF().x-player.x,(PLANT_REF().z+1.5)-player.z)<3.2)t='Действие — кирпичный завод (камень → кирпич)';
  if(!t&&Math.hypot(MARKET_NPC.x-player.x,MARKET_NPC.z-player.z)<3)t=marketOpen()?'Действие — рынок Марии (дорогие цены)':'Рынок закрыт (9:00–15:00)';
  if(!t&&nearSandMound())t='Действие — набрать песка (+2) ⛱';
- if(!t&&nearOcto())t='Действие — поймать осьминога (+150 ₽) 🐙';
+ if(!t&&nearOcto())t='Действie — поймать осьминога (+150 ₽) 🐙';
  if(!t&&nearFish())t=fishState===0?(rodHave?'Действие — забросить удочку':'Удочка у Фёдора 🎣'):(fishState===1?'Ждём клёва…':'КЛЮЁТ! Действие — подсечь! 🐟');
  if(!t&&jobActive){
   const z=jobType==='port'?PORT_ZONE:ZONE;
@@ -2180,7 +2416,7 @@ function updateHint(){
     ?'Действие — сдать груз (+'+(n*payPerBox())+' ₽)'
     :(carryCount>1?(jobType==='port'?'Вези тележку к жёлтому кольцу ('+carryCount+' ящ.)':'Вези тележку к зелёному кольцу ('+carryCount+' ящ.)'):(jobType==='port'?'Неси ящик к жёлтому кольцу':'Неси ящик к зелёному кольцу'));
   }else if(nearestJobBox())t='Действие — '+(trolleyCarried?'загрузить ящик на тележку':'взять ящик');
-  else t=(jobType==='port'?'Ящики на краю причала':'Ящики у общежития')+' — осталось '+boxesLeft;
+  else t=(jobType==='port'?'Ящики на краю причла':'Ящики у общежития')+' — осталось '+boxesLeft;
  }
  if(!t){
   const lt=nearestLandedTree();
@@ -2193,6 +2429,7 @@ function updateHint(){
  hintEl.style.display=t?'block':'none';
  if(t)hintEl.textContent=t;
 }
+updAmmoChip();
 const mapCv=$('mapCv'),mg=mapCv.getContext('2d');
 let mapOpen=false;
 function toggleMap(){
@@ -2231,6 +2468,7 @@ function drawMap(){
  mg.fillRect(px(-64),pz(7),18*sc,3.2*sc);
  mg.fillRect(px(-72),pz(8),3.2*sc,24*sc);
  mg.fillRect(px(55),pz(-11.5),30*sc,3.5*sc);
+ mg.fillRect(px(90),pz(-11),3.2*sc,10*sc);
  mg.fillStyle='#f0f0e0';
  for(let x=-64;x<=64;x+=8)mg.fillRect(px(x),pz(-0.2),2*sc,0.4*sc);
  /* постройки */
@@ -2242,6 +2480,15 @@ function drawMap(){
  mg.fillStyle='#5a6270';mg.fillRect(px(18),pz(-4.6),4*sc,2.4*sc);
  mg.fillStyle='#7fae57';mg.fillRect(px(-6),pz(24),12*sc,12*sc);
  mg.fillStyle='#9aa2aa';mg.fillRect(px(155),pz(52),10*sc,8*sc);
+ /* полигон: вал, стенды */
+ mg.fillStyle='#6a5a40';
+ mg.fillRect(px(RANGE.x-11),pz(RANGE.z-14),22*sc,1.4*sc);
+ mg.fillRect(px(RANGE.x-10.6),pz(RANGE.z-14),1.2*sc,26*sc);
+ mg.fillRect(px(RANGE.x+9.4),pz(RANGE.z-14),1.2*sc,26*sc);
+ mg.fillStyle='#d84a3a';
+ RANGE_TARGETS.forEach(t=>{
+  if(!t.down)mg.fillRect(px(t.x-0.7),pz(t.z-0.7),1.4*sc,1.4*sc);
+ });
  /* кораблик */
  mg.fillStyle='#2a4a6a';
  mg.fillRect(px(196),pz(42),8*sc,6*sc);
@@ -2272,6 +2519,8 @@ function drawMap(){
  mg.fillStyle='#ffe0a0';
  mg.fillText('ЗАВОД 🧱',px(14),pz(-15)+3);
  mg.fillText('КАРЬЕРА ⛏',px(80),pz(-10)+3);
+ mg.fillStyle='#ffd0d0';
+ mg.fillText('ПОЛИГОН 🔫',px(RANGE.x),pz(RANGE.z+4)+3);
  mg.fillStyle='#b0c8e0';
  mg.fillText('ГАРАЖ 🛒',px(11),pz(27)+3);
  mg.fillStyle=mOpen?'#ffe080':'#aaaaaa';
@@ -2288,7 +2537,6 @@ function drawMap(){
  mg.fillRect(bkx-4,bkz-8,8,4);
  mg.fillStyle='#c8e0ff';mg.font='bold 9px sans-serif';
  mg.fillText('МАЯК 🗼',bkx,bkz-12);
- /* подпись острова */
  mg.fillStyle='#eaffd0';mg.font='bold 9px sans-serif';
  mg.fillText('ПЕСЧАНЫЙ ОСТРОВ ⛱',px(ISLAND.x),pz(ISLAND.z)-17);
  /* автобусные остановки */
@@ -2321,7 +2569,8 @@ function drawMap(){
  mg.restore();
 }
 const hadSave=loadWorld();
-if(!hadSave)toast('ZINI CITY! Лодка продаётся у Бориса в порту — на острове песок и осьминог 🛶🐙');
+if(!hadSave)toast('ZINI CITY! Полигон — за карьером, мастер Сергей выдаёт пистолет 🔫');
+updAmmoChip();
 let lastTs=0,carHonked=false;
 function loop(ts){
  requestAnimationFrame(loop);
@@ -2357,16 +2606,13 @@ function loop(ts){
   sw2.pivot.rotation.x=ang;
   if(Math.abs(ang)>0.43&&Math.abs(prev)<=0.43)creak();
  }
- /* рынок */
  marketNpc.rotation.y=Math.atan2(player.x-MARKET_NPC.x,player.z-MARKET_NPC.z);
  marketNpc.position.y=marketOpen()?Math.abs(Math.sin(ts*0.0022))*0.02:0;
  marketStalls.forEach(g=>{g.position.y=marketOpen()?0:0.35;});
- /* маяк: луч вращается ночью и в ливень */
  beamPivot.rotation.y=ts*0.0012;
  const bOn=dayF()<0.4||rainF>0.6;
  lighthouseBeam.material.opacity=bOn?0.3:0;
  beaconLight.intensity=bOn?1.1:0;
- /* рыбалка: таймер клёва и упущенная поклёвка */
  if(fishState===1){
   fishT-=dt;
   if(fishT<=0){fishState=2;fishT=3;sfx(900,0.12,'triangle',0.05);toast('Клюёт! Подсекай! 🐟');}
@@ -2374,7 +2620,7 @@ function loop(ts){
   fishT-=dt;
   if(fishT<=0){fishState=0;toast('Поклёвка пропущена — рыба уплыла…');}
  }
- /* лодка: следует за игроком на воде или ждёт у причала */
+ /* лодка */
  if(sailing){
   boatWorld.position.set(player.x,0.05+Math.sin(ts*0.002)*0.06,player.z);
   boatWorld.rotation.y=yaw;
@@ -2382,7 +2628,7 @@ function loop(ts){
   boatWorld.position.set(BOAT_POS.x,0.05+Math.sin(ts*0.002)*0.06,BOAT_POS.z);
   boatWorld.rotation.y=Math.PI/2;
  }
- /* осьминог: плавает, возрождается через 90 секунд */
+ /* осьминог */
  if(octoAlive){
   octo.position.set(OCTO.x+Math.sin(ts*0.001)*1.5,0.15+Math.sin(ts*0.003)*0.15,OCTO.z+Math.cos(ts*0.0013)*1.5);
   octo.rotation.y=ts*0.0008;
@@ -2390,6 +2636,52 @@ function loop(ts){
   octoTimer-=dt;
   if(octoTimer<=0){octoAlive=true;octo.visible=true;toast('Осьминог показался у острова 🐙');}
  }
+ /* мишени полигона: падение и подъём */
+ RANGE_TARGETS.forEach(t=>{
+  if(t.down){
+   t.timer-=dt;
+   t.g.rotation.x=Math.min(Math.PI/2,t.g.rotation.x+dt*6);
+   if(t.timer<=0){
+    t.down=false;
+    t.g.rotation.x=0;
+   }
+  }
+ });
+ /* гильзы: полёт, падение, уборка */
+ for(let i=casings.length-1;i>=0;i--){
+  const c=casings[i];
+  c.userData.life-=dt;
+  c.userData.v.y-=9.8*dt;
+  c.position.addScaledVector(c.userData.v,dt);
+  c.rotation.x+=dt*9;c.rotation.z+=dt*7;
+  if(c.position.y<0.03){c.position.y=0.03;c.userData.v.set(0,0,0);}
+  if(c.userData.life<=0){
+   scene.remove(c);casings.splice(i,1);
+  }
+ }
+ /* перезарядка */
+ if(reloading){
+  reloadT-=dt;
+  if(reloadT<=0){
+   reloading=false;
+   if(selMat==='smg'){
+    const need=SMG_MAG-magS,take=Math.min(need,ammoS);
+    magS+=take;ammoS-=take;
+   }else{
+    const need=GUN_MAG-magP,take=Math.min(need,ammoP);
+    magP+=take;ammoP-=take;
+   }
+   saveMags();saveAmmo();updAmmoChip();
+   sfx(700,0.07,'square',0.05);
+  }
+ }
+ /* автомат: очередь при зажатии */
+ const fireHeld=(IS_TOUCH?touchFireHeld:mouseHeld);
+ if(selMat==='smg'&&fireHeld&&!dlgOpen&&!mapOpen&&!reloading){
+  smgCd-=dt;
+  if(smgCd<=0){fireGun();smgCd=0.11;}
+ }
+ if(selMat!=='smg')smgCd=0;
  /* машина */
  const ahead=carDir>0?(player.x-carX):(carX-player.x);
  const onRoad=Math.abs(player.z-0)<2.2;
@@ -2409,11 +2701,9 @@ function loop(ts){
  if(Math.abs(player.z-car.position.z)<1.3&&Math.abs(player.x-carX)<2.3){
   player.z+=player.z>car.position.z?0.2:-0.2;
  }
- /* корабль: покачивание и флаг */
  ship.position.y=Math.sin(ts*0.0012)*0.12;
  ship.rotation.z=Math.sin(ts*0.0009)*0.02;
  shipFlag.rotation.y=Math.sin(ts*0.002)*0.4;
- /* деревья */
  for(const t of chopTrees){
   if(t.falling&&!t.landed){
    t.fallP=Math.min(1,t.fallP+dt*0.8);
@@ -2447,6 +2737,10 @@ function loop(ts){
  if(Math.hypot(FEDOR.x-player.x,FEDOR.z-player.z)<7){
   fedorNpc.rotation.y=Math.atan2(player.x-FEDOR.x,player.z-FEDOR.z);
   fedorNpc.children[0].position.y=1.05+Math.sin(ts*0.0022)*0.012;
+ }
+ if(Math.hypot(SERGEY.x-player.x,SERGEY.z-player.z)<7){
+  sergeyNpc.rotation.y=Math.atan2(player.x-SERGEY.x,player.z-SERGEY.z);
+  sergeyNpc.children[0].position.y=1.05+Math.sin(ts*0.0021)*0.012;
  }
  updateNeighbors(dt,ts);
  /* движение */
@@ -2485,8 +2779,13 @@ function loop(ts){
  armR.position.y=-0.42+Math.abs(Math.sin(bobT))*0.02;
  armL.rotation.x=-0.5-walkSw*0.5;
  armL.position.y=-0.42-Math.abs(Math.sin(bobT))*0.02;
- held.position.set(0.32+Math.sin(bobT)*0.012,-0.36+Math.abs(Math.sin(bobT))*0.02,-0.62+sw*0.15);
- held.rotation.set(0.2-sw*0.8,-0.4,0.08);
+ if(selMat==='gun'||selMat==='smg'){
+  held.position.set(0.3,-0.34+Math.abs(Math.sin(bobT))*0.015,-0.55+sw*0.12);
+  held.rotation.set(0.15-sw*0.6,-0.25,0.03);
+ }else{
+  held.position.set(0.32+Math.sin(bobT)*0.012,-0.36+Math.abs(Math.sin(bobT))*0.02,-0.62+sw*0.15);
+  held.rotation.set(0.2-sw*0.8,-0.4,0.08);
+ }
  if(sailing){
   armR.rotation.x=-1.1+Math.sin(ts*0.005)*0.3;
   armL.rotation.x=-1.1-Math.sin(ts*0.005)*0.3;
