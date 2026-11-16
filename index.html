@@ -90,7 +90,6 @@ body.touch #tip{display:none}
 </div>
 <script>
 'use strict';
-/* ===== ZINI CITY — Спринт 7: день и ночь, гараж с тележкой, фонарь у дома ===== */
 const $=id=>document.getElementById(id);
 const IS_TOUCH=('ontouchstart' in window)||navigator.maxTouchPoints>0;
 if(IS_TOUCH)document.body.classList.add('touch');
@@ -150,7 +149,6 @@ scene.add(moonLight);
  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthWrite:false}));
  sp.scale.set(60,60,1);sp.position.set(200,260,100);scene.add(sp);
 })();
-/* луна и звёзды */
 const moon=(function(){
  const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d');
  const gr=g.createRadialGradient(64,64,20,64,64,64);
@@ -211,8 +209,7 @@ function brickFaceMake(base){
   g.strokeStyle='rgba(90,80,70,.4)';g.lineWidth=1.5;
   for(let i=0;i<7;i++){
    const x=Math.random()*s,y=Math.random()*s;
-   g.beginPath();g.moveTo(x,y);
-   g.lineTo(x+(Math.random()-0.5)*22,y+(Math.random()-0.5)*22);g.stroke();
+   g.beginPath();g.moveTo(x,y);g.lineTo(x+(Math.random()-0.5)*22,y+(Math.random()-0.5)*22);g.stroke();
   }
   noise(g,s,300,0.06);
  });
@@ -251,9 +248,7 @@ function plankFaceMake(){
    g.strokeStyle='rgba(60,38,18,'+(0.12+Math.random()*0.3).toFixed(2)+')';
    g.lineWidth=1+Math.random()*2;
    const gx=Math.random()*s;
-   g.beginPath();g.moveTo(gx,4);
-   g.bezierCurveTo(gx+7,s*0.3,gx-7,s*0.7,gx+3,s-4);
-   g.stroke();
+   g.beginPath();g.moveTo(gx,4);g.bezierCurveTo(gx+7,s*0.3,gx-7,s*0.7,gx+3,s-4);g.stroke();
   }
   for(let k=0;k<26;k++){
    g.strokeStyle='rgba(190,150,110,'+(0.05+Math.random()*0.09).toFixed(2)+')';
@@ -514,7 +509,6 @@ function decoWindow(x,y,z,w,h,alongX){
  const m=new THREE.Mesh(new THREE.BoxGeometry(alongX?w:0.12,h,alongX?0.12:w),new THREE.MeshStandardMaterial({color:0x2b3a4a,roughness:0.15,metalness:0.35}));
  m.position.set(x,y,z);scene.add(m);
 }
-/* здания */
 addSolidBox(-20,-11,10,4.4,8,0xcfd4da,0.25);
 addSolidBox(-20,-11+4.35,11,0.5,9,0x5a6270,0.18);
 decoWindow(-23.4,2.4,-10.9,1.4,1.4,false);decoWindow(-20,2.4,-10.9,1.4,1.4,false);decoWindow(-16.6,2.4,-10.9,1.4,1.4,false);
@@ -535,7 +529,6 @@ const glBack=new THREE.Mesh(roundedBox(4,1.8,0.15,0.1),new THREE.MeshStandardMat
 glBack.position.set(20,1.15,-4.35);glBack.userData.city=true;scene.add(glBack);statics.push(glBack);pickables.push(glBack);
 const glB=new THREE.Box3().setFromObject(glBack);
 solids.push({minX:glB.min.x,maxX:glB.max.x,minY:glB.min.y,maxY:glB.max.y,minZ:glB.min.z,maxZ:glB.max.z});
-/* кирпичный завод */
 addSolidBox(14,-16.5,8,4,5,0x9a5f3f,0.25);
 addSolidBox(14,-13.4,9,0.5,6,0x6a4228,0.15);
 const plantChim=new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.8,6,10),matOf(0x7a4a3a));
@@ -554,7 +547,6 @@ for(let i=0;i<5;i++){
 }
 addSolidBox(12,-12.2,0.4,1.1,0.4,0x6a5a3a,0.08);
 addSolidBox(16,-12.2,0.4,1.1,0.4,0x6a5a3a,0.08);
-/* магазин */
 const SHOP_NPC=new THREE.Vector3(26.5,0,-1.2);
 addSolidBox(27,-5,4.4,3,3.2,0x4a7a9a,0.2);
 addSolidBox(27,-3.55,5.2,0.4,4.4,0x365a72,0.12);
@@ -568,13 +560,11 @@ const shopBrick=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.14,0.25),brickMatsArr
 shopBrick.position.set(26.2,1.15,-3.5);scene.add(shopBrick);
 const shopBoard=new THREE.Mesh(new THREE.BoxGeometry(1.2,0.1,0.06),boardMatsArr());
 shopBoard.position.set(27.8,1.15,-3.5);shopBoard.rotation.y=0.3;scene.add(shopBoard);
-/* зона сдачи дома */
 const SELL_POS=new THREE.Vector3(0,0,33);
 const sellFlag=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.05,2.2,8),matOf(0x6a4a2a));
 sellFlag.position.set(0,1.1,33);scene.add(sellFlag);
 const flagCloth=new THREE.Mesh(new THREE.PlaneGeometry(1.1,0.6),new THREE.MeshStandardMaterial({color:0xffd86b,emissive:0xaa8800,emissiveIntensity:0.25,side:THREE.DoubleSide}));
 flagCloth.position.set(0.58,1.85,33);scene.add(flagCloth);
-/* фонари (со списком для ночного света) */
 const lampsArr=[];
 function lamp(x,z,withLight){
  const p=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.09,4.2,8),matOf(0x3a4250));
@@ -587,7 +577,7 @@ function lamp(x,z,withLight){
  lampsArr.push({cap,li});
 }
 lamp(3.5,-4.5,true);lamp(-3.5,6,false);lamp(3.5,18,true);lamp(-3.5,24,false);
-lamp(7.5,24,true); /* фонарь у дома */
+lamp(7.5,24,true);
 const plot=new THREE.Mesh(new THREE.PlaneGeometry(12,12),matOf(0x7fae57));
 plot.rotation.x=-Math.PI/2;plot.position.set(0,0.02,30);plot.receiveShadow=true;plot.userData.plot=true;scene.add(plot);pickables.push(plot);
 function fenceLine(x1,z1,x2,z2){
@@ -655,12 +645,11 @@ sign('КАРЬЕРА',82,2.4,-10,0.7);
 sign2('КИРПИЧНЫЙ ЗАВОД',14,4.6,-15.5,0.62);
 sign2('СТРОЙМАТЕРИАЛЫ',27,3.7,-3.6,0.6);
 sign2('СДАЧА ДОМА',0,2.5,33,0.56);
-/* ===== ГАРАЖ С ТЕЛЕЖКОЙ (Спринт 7) ===== */
 const GARAGE=new THREE.Vector3(10.8,0,30);
-addSolidBoxY(10.8,1.3,28.2,4.2,2.6,0.3,0x7a8288,0.12); /* задняя стена */
-addSolidBoxY(8.9,1.3,30,0.3,2.6,4.2,0x8a9096,0.12); /* левая */
-addSolidBoxY(12.7,1.3,30,0.3,2.6,4.2,0x8a9096,0.12); /* правая */
-addSolidBoxY(10.8,2.75,30,4.8,0.3,4.8,0x5a6270,0.12); /* крыша */
+addSolidBoxY(10.8,1.3,28.2,4.2,2.6,0.3,0x7a8288,0.12);
+addSolidBoxY(8.9,1.3,30,0.3,2.6,4.2,0x8a9096,0.12);
+addSolidBoxY(12.7,1.3,30,0.3,2.6,4.2,0x8a9096,0.12);
+addSolidBoxY(10.8,2.75,30,4.8,0.3,4.8,0x5a6270,0.12);
 sign2('ГАРАЖ',10.8,3.4,30,0.56);
 function makeTrolleyMesh(){
  const g=new THREE.Group();
@@ -699,7 +688,6 @@ function trolleyAction(){
  }
  updateHeld();sfx(500,0.08,'sine',0.04);
 }
-/* ===== ПЕРСОНАЖИ ===== */
 function makePerson(o){
  const g=new THREE.Group();
  const skin=o.skin||0xd9a066;
@@ -756,18 +744,15 @@ function updateNeighbors(dt,ts){
   n.g.position.y=Math.abs(Math.sin(ts*0.003))*0.02;
  }
 }
-/* Тимофей */
 const NPC_POS=new THREE.Vector3(-16.5,0,-5.5);
 const npc=makePerson({shirt:0x2f6fc0,pants:0x2a3550,hat:0x1f4a8a,hair:0x3a2a1a});
 npc.position.copy(NPC_POS);scene.add(npc);
 solids.push({minX:NPC_POS.x-0.4,maxX:NPC_POS.x+0.4,minY:0,maxY:1.9,minZ:NPC_POS.z-0.4,maxZ:NPC_POS.z+0.4});
 sign('ТИМОФЕЙ · БИРЖА ТРУДА',NPC_POS.x,2.45,NPC_POS.z,0.62);
-/* Валентина */
 const shopNpc=makePerson({shirt:0xb04a78,pants:0xb04a78,hair:0x6a3a1a,bow:0xffd0e0});
 shopNpc.position.copy(SHOP_NPC);scene.add(shopNpc);
 solids.push({minX:SHOP_NPC.x-0.4,maxX:SHOP_NPC.x+0.4,minY:0,maxY:1.9,minZ:SHOP_NPC.z-0.4,maxZ:SHOP_NPC.z+0.4});
 sign('ВАЛЕНТИНА · МАГАЗИН',SHOP_NPC.x,2.3,SHOP_NPC.z,0.56);
-/* ЗОНА СДАЧИ ГРУЗА */
 const ZONE=new THREE.Vector3(14,0.05,2.2);
 const zoneRing=new THREE.Mesh(new THREE.TorusGeometry(1.1,0.08,8,32),new THREE.MeshStandardMaterial({color:0x2ee38b,emissive:0x2ee38b,emissiveIntensity:0.7}));
 zoneRing.rotation.x=-Math.PI/2;zoneRing.position.copy(ZONE);scene.add(zoneRing);
@@ -823,10 +808,9 @@ carryGroup.position.set(-0.14,-0.36,-0.6);
 carryGroup.rotation.set(0.1,0.25,0);
 carryGroup.visible=false;
 camera.add(carryGroup);
-/* стопка ящиков на тележке */
 const carryStack=new THREE.Group();
 (function(){
- const offs=[[0,-0.34],[0,-0.34+0.44],[0,-0.34+0.88],[-0.13,-0.12],[0.13,-0.12]];
+ const offs=[[0,-0.34],[0,0.10],[0,0.54],[-0.13,-0.12],[0.13,-0.12]];
  offs.forEach(o=>{
   const c=new THREE.Mesh(roundedBox(0.4,0.42,0.4,0.04),crateMat);
   c.position.set(o[0]-0.16,o[1],-0.6);
@@ -835,7 +819,6 @@ const carryStack=new THREE.Group();
 })();
 carryStack.visible=false;
 camera.add(carryStack);
-/* ===== ПАРК ===== */
 const PARK=new THREE.Vector3(-19,0,9);
 (function(){
  const lawn=new THREE.Mesh(new THREE.PlaneGeometry(16,12),matOf(0x67a44e));
@@ -858,7 +841,7 @@ function bench(x,z,rot){
  });
  g.position.set(x,0,z);g.rotation.y=rot||0;
  scene.add(g);
- const w=1.7/2,h=1.1/2;
+ const w=1.7/2;
  const cos=Math.abs(Math.cos(rot||0)),sin=Math.abs(Math.sin(rot||0));
  const ex=cos*w+sin*0.5,ez=sin*w+cos*0.5;
  solids.push({minX:x-ex,maxX:x+ex,minY:0,maxY:1.1,minZ:z-ez,maxZ:z+ez});
@@ -916,7 +899,6 @@ const fountain={};
  solids.push({minX:-21.4,maxX:-16.6,minY:0,maxY:0.9,minZ:6.6,maxZ:11.4});
 })();
 sign('ПАРК ZINI',PARK.x,3,PARK.z-5.5,0.62);
-/* ===== АВТОМАШИНА ===== */
 const car=new THREE.Group();
 const carHeadMats=[],carTailMats=[];
 (function(){
@@ -947,9 +929,7 @@ const carHeadMats=[],carTailMats=[];
  });
 })();
 scene.add(car);
-let carX=-55,carDir=1,carSpeed=8,carStop=0;
-let carX=-55,carDir=1,carSpeed=8,carStop=0;
-/* ===== ЛЕС ===== */
+let carX=-55,carDir=1,carSpeed=8;
 const chopTrees=[];
 function spawnForestTree(x,z){
  const g=new THREE.Group();
@@ -1008,7 +988,6 @@ function collectTree(t){
  const st=t.stump;
  setTimeout(()=>{if(st)scene.remove(st);spawnForestTree(t.x,t.z);},60000);
 }
-/* ===== КАРЬЕРА ===== */
 const rocks=[];
 function spawnRock(x,z){
  const g=new THREE.Group();
@@ -1050,7 +1029,6 @@ function tryMine(){
  if(r.hp<=0)breakRock(r);
  else toast('Ещё удар(ов): '+r.hp);
 }
-/* ===== ШТУЧНЫЕ ДЕТАЛИ ===== */
 const qY90=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),Math.PI/2);
 const qZ90=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI/2);
 function makeBrick(){
@@ -1213,7 +1191,6 @@ function supportHeight(){
  }
  return s;
 }
-/* ===== ВВОД ===== */
 const keys={};
 addEventListener('keydown',e=>{
  keys[e.code]=true;
@@ -1321,7 +1298,6 @@ function UIC(){
  document.querySelectorAll('.hchip').forEach(c=>c.onclick=()=>selectMat(c.dataset.k));
 }
 UIC();
-/* --- ДЕНЬ И НОЧЬ --- */
 let dayT=0.15;
 const DAY_LEN=360;
 const cNight=new THREE.Color(0x0e1830),cDawn=new THREE.Color(0xff9a5a),cDay=new THREE.Color(0x9ed9ff);
@@ -1358,8 +1334,7 @@ function updateDayNight(){
  const hh=Math.floor((dayT*24+6)%24),mm=Math.floor((((dayT*24+6)%24)%1)*60);
  $('dayChip').textContent=(lampsOn?'🌙 ':'☀ ')+(hh<10?'0':'')+hh+':'+(mm<10?'0':'')+mm;
 }
-/* --- ДИАЛОГИ --- */
-let dlgOpen=false,dlgMode='npc';
+let dlgOpen=false,dlgMode='npc',dlgWho=null;
 function openDialog(mode,who){
  dlgMode=mode;dlgWho=who||null;
  dlgOpen=true;
@@ -1370,7 +1345,6 @@ function openDialog(mode,who){
  $('lockHint').style.display='none';
  sfx(500,0.06,'sine',0.04);
 }
-let dlgWho=null;
 function closeDialog(){
  dlgOpen=false;
  $('dlg').style.display='none';
@@ -1425,4 +1399,456 @@ function renderDialog(){
   btns.appendChild(b);
  }else if(jobActive){
   $('dlgText').textContent='Смена идёт! Осталось ящиков: '+boxesLeft+(trolleyCarried?' — с тележкой грузи все разом!':'. Носи по одному или возьми тележку в гараже.');
-  const b=document.createElement('button');b.className='dbtn alt';b.textContent='Завершить смену дос
+  const b=document.createElement('button');b.className='dbtn alt';b.textContent='Завершить смену досрочно';b.onclick=()=>{closeDialog();endJob(false);};btns.appendChild(b);
+ }else{
+  $('dlgText').textContent='Здравствуй, '+NICK+'! Смена грузчика: 5 ящиков — 30 ₽ за ящик (ночью 45 ₽) и 50 ₽ бонуса. Возьми тележку в гараже у участка — вези все ящики разом. Дом строй и продавай у жёлтого флага.';
+  const b=document.createElement('button');b.className='dbtn';b.textContent='Устроиться на смену ('+payPerBox()+' ₽/ящик)';b.onclick=()=>{closeDialog();startJob();};btns.appendChild(b);
+ }
+ const c=document.createElement('button');c.className='dbtn alt';c.textContent='Закрыть';c.onclick=closeDialog;btns.appendChild(c);
+}
+$('dlg').addEventListener('click',e=>{if(e.target===$('dlg'))closeDialog();});
+function saveMoneyAndInv(){try{localStorage.setItem('mg_money',String(money));}catch(e){}}
+function houseAppraisal(){
+ let total=0,count=0;
+ for(const p of pieces){
+  if(p.mesh.position.x>-6.5&&p.mesh.position.x<6.5&&p.mesh.position.z>23.5&&p.mesh.position.z<36.5){
+   total+=PIECES[p.t].sell;count++;
+  }
+ }
+ return{total,count};
+}
+function sellHouse(){
+ const a=houseAppraisal();
+ if(a.count<8){toast('Дом слишком мал — построй хотя бы из 8 деталей (сейчас: '+a.count+')');return;}
+ const payout=a.total*2;
+ setMoney(money+payout);
+ for(let i=pieces.length-1;i>=0;i--){
+  const p=pieces[i];
+  if(p.mesh.position.x>-6.5&&p.mesh.position.x<6.5&&p.mesh.position.z>23.5&&p.mesh.position.z<36.5)removePiece(p);
+ }
+ saveWorld();UIC();
+ coin();setTimeout(coin,150);
+ toast('Дом продан! '+a.count+' деталей → +'+payout+' ₽ 🏠');
+}
+const hi=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1,1,1)),new THREE.LineBasicMaterial({color:0x7ef2ff}));
+hi.visible=false;scene.add(hi);
+function nearGarage(){return Math.hypot(GARAGE.x-player.x,GARAGE.z-player.z)<3;}
+function contextAction(){
+ heldSwing=0.3;
+ if(nearGarage()){trolleyAction();return;}
+ if(nearestNPC()<3){openDialog('npc');return;}
+ for(const n of neighbors){
+  if(Math.hypot(n.g.position.x-player.x,n.g.position.z-player.z)<2.6){openDialog(n.dlgKey,n.name);return;}
+ }
+ if(Math.hypot(SHOP_NPC.x-player.x,SHOP_NPC.z-player.z)<3){openDialog('shop');return;}
+ if(Math.hypot(PLANT_REF().x-player.x,(PLANT_REF().z+1.5)-player.z)<3.2){openDialog('plant');return;}
+ if(jobActive){
+  if(carrying||carryCount>0){
+   if(Math.hypot(ZONE.x-player.x,ZONE.z-player.z)<2.6)deliverBox();
+   else toast('Неси груз к зелёному кольцу 📦');
+   return;
+  }
+  const b=nearestJobBox();
+  if(b){
+   if(trolleyCarried){
+    carryCount++;setCarryStack(carryCount);carryStack.visible=true;
+    scene.remove(b);jobBoxes.splice(jobBoxes.indexOf(b),1);
+    sfx(200,0.08,'sine',0.04);
+    toast('Загружено на тележку: '+carryCount+'/5');
+   }else{
+    carrying=b;scene.remove(b);carryGroup.visible=true;held.visible=false;
+    sfx(200,0.08,'sine',0.04);
+   }
+   return;
+  }
+  toast('Ящики у общежития — осталось '+boxesLeft);
+  return;
+ }
+ const lt=nearestLandedTree();
+ if(lt){collectTree(lt);return;}
+ if(selMat==='axe'){tryChop();return;}
+ if(selMat==='pick'){tryMine();return;}
+ if(Math.hypot(SELL_POS.x-player.x,SELL_POS.z-player.z)<6){sellHouse();return;}
+ if(mode==='build')placePiece();else breakPiece();
+}
+function PLANT_REF(){return new THREE.Vector3(14,0,-13.5);}
+function deliverBox(){
+ const n=carrying?1:carryCount;
+ if(n<=0)return;
+ setMoney(money+n*payPerBox());coin();
+ carrying=null;carryGroup.visible=false;held.visible=true;
+ carryCount=0;setCarryStack(0);carryStack.visible=false;
+ boxesLeft-=n;
+ if(boxesLeft<=0){boxesLeft=0;endJob(true);}
+ else{updateJobChip();toast('+'+(n*payPerBox())+' ₽! Осталось ящиков: '+boxesLeft);}
+}
+function nearestNPC(){return player.distanceTo(NPC_POS);}
+function nearestJobBox(){
+ let best=null,bd=2.6;
+ for(const b of jobBoxes){
+  const d=Math.hypot(b.position.x-player.x,b.position.z-player.z);
+  if(d<bd){bd=d;best=b;}
+ }
+ return best;
+}
+function placePiece(){
+ if(selMat==='axe'||selMat==='pick'){toast('Инструментом не строят — выбери материал');return;}
+ if(trolleyCarried||carrying){toast('Руки заняты тележкой/ящиком!');return;}
+ const c=computePlacement();
+ if(!c.ok){toast(c.reason);sfx(220,0.1,'square',0.04);return;}
+ if(inv[selMat]<=0){toast(PIECES[selMat].n+' закончился — Валентина продаёт');return;}
+ inv[selMat]--;
+ spawnPiece(selMat,c.pos,c.q);
+ thunk();UIC();
+}
+function breakPiece(){
+ if(selMat==='axe'||selMat==='pick'){toast('Инструментом можно добывать только природное');return;}
+ if(trolleyCarried||carrying){toast('Руки заняты!');return;}
+ ray.setFromCamera(V2,camera);
+ const hits=ray.intersectObjects(pieces.map(p=>p.mesh),true);
+ if(!hits.length){toast('Тут ломать нечего (город не трогаем 🙂)');return;}
+ let o=hits[0].object;while(o&&!o.userData.pieceRef)o=o.parent;
+ if(!o||!o.userData.pieceRef)return;
+ const p=o.userData.pieceRef;
+ inv[p.t]=(inv[p.t]||0)+1;
+ removePiece(p);crack();UIC();
+}
+const ghost={brick:makeBrick(),board:makeBoard(),glass:makeWindow(),stone:makeStone()};
+Object.keys(ghost).forEach(k=>{
+ ghost[k].traverse(o=>{if(o.isMesh){if(Array.isArray(o.material))o.material=o.material.map(m=>m.clone());else o.material=o.material.clone();o.material.transparent=true;o.material.opacity=0.35;o.castShadow=false;o.receiveShadow=false;}});
+ ghost[k].visible=false;scene.add(ghost[k]);
+});
+let hlT=0;
+function updateHighlight(dt){
+ hlT-=dt;
+ if(hlT>0)return;
+ hlT=0.12;
+ Object.keys(ghost).forEach(k=>ghost[k].visible=false);
+ hi.visible=false;
+ if(carrying||carryCount>0||jobActive||trolleyCarried)return;
+ if((selMat==='axe'||selMat==='pick')&&mode==='build'){
+  const target=selMat==='axe'?chopTrees.filter(t=>!t.falling).map(t=>t.trunk):rocks.map(r=>r.m);
+  const prop=selMat==='axe'?'chop':'rock';
+  ray.setFromCamera(V2,camera);
+  const hits=ray.intersectObjects(target,false);
+  if(hits.length&&hits[0].distance<4.5){
+   const obj=hits[0].object.userData[prop];
+   const b3=new THREE.Box3().setFromObject(obj.g);
+   const sz=b3.getSize(new THREE.Vector3()),ct=b3.getCenter(new THREE.Vector3());
+   hi.position.copy(ct);hi.scale.set(sz.x+0.05,sz.y+0.05,sz.z+0.05);hi.visible=true;
+  }
+  return;
+ }
+ if(mode==='build'){
+  const c=computePlacement();
+  if(c.ok){
+   const g=ghost[selMat];
+   g.position.copy(c.pos);
+   if(c.q)g.quaternion.copy(c.q);else g.quaternion.identity();
+   g.visible=true;
+  }
+ }else{
+  ray.setFromCamera(V2,camera);
+  const hits=ray.intersectObjects(pieces.map(p=>p.mesh),true);
+  if(hits.length){
+   let o=hits[0].object;while(o&&!o.userData.pieceRef)o=o.parent;
+   if(o&&o.userData.pieceRef){
+    const b3=new THREE.Box3().setFromObject(o.userData.pieceRef.mesh);
+    const sz=b3.getSize(new THREE.Vector3()),ct=b3.getCenter(new THREE.Vector3());
+    hi.position.copy(ct);hi.scale.set(sz.x+0.02,sz.y+0.02,sz.z+0.02);hi.visible=true;
+   }
+  }
+ }
+}
+function makeArm(sleeveHex){
+ const g=new THREE.Group();
+ const sleeve=new THREE.Mesh(new THREE.CylinderGeometry(0.085,0.07,0.4,8),matOf(sleeveHex));
+ sleeve.rotation.x=Math.PI/2;sleeve.position.z=-0.2;g.add(sleeve);
+ const fore=new THREE.Mesh(new THREE.CylinderGeometry(0.058,0.05,0.2,8),matOf(0xd9a066));
+ fore.rotation.x=Math.PI/2;fore.position.z=-0.48;g.add(fore);
+ const hand=new THREE.Mesh(new THREE.SphereGeometry(0.08,10,8),matOf(0xd9a066));
+ hand.position.z=-0.6;hand.scale.set(1,0.8,1.15);g.add(hand);
+ g.traverse(o=>{if(o.isMesh)o.castShadow=false;});
+ return g;
+}
+const armR=makeArm(0x2f6fc0),armL=makeArm(0x2f6fc0);
+armR.position.set(0.3,-0.42,-0.28);armR.rotation.set(-0.55,-0.3,0.12);
+armL.position.set(-0.3,-0.42,-0.28);armL.rotation.set(-0.5,0.3,-0.12);
+camera.add(armR);camera.add(armL);
+function makeToolMesh(kind){
+ const g=new THREE.Group();
+ const handle=new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.028,0.55,7),matOf(0x7a5330));
+ handle.rotation.x=Math.PI/2;handle.position.set(0,0.05,-0.28);g.add(handle);
+ if(kind==='axe'){
+  const head=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.16,0.09),matOf(0xb8c0c8));
+  head.position.set(0,0.09,-0.52);g.add(head);
+  const blade=new THREE.Mesh(new THREE.ConeGeometry(0.09,0.16,4),matOf(0xd8e0e8));
+  blade.rotation.x=Math.PI/2;blade.rotation.z=Math.PI/4;blade.position.set(0,0.09,-0.62);g.add(blade);
+ }else{
+  const head=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.05,0.06),matOf(0x9aa2aa));
+  head.position.set(0,0.1,-0.5);g.add(head);
+  [-1,1].forEach(s=>{
+   const spike=new THREE.Mesh(new THREE.ConeGeometry(0.045,0.1,5),matOf(0xd8e0e8));
+   spike.position.set(s*0.09,0.1,-0.5);
+   spike.rotation.z=-s*Math.PI/2;
+   g.add(spike);
+  });
+ }
+ g.traverse(o=>{if(o.isMesh)o.castShadow=false;});
+ return g;
+}
+const held=new THREE.Group();
+const heldBrick=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.09,0.16),brickMatsArr());
+const heldBoard=new THREE.Mesh(new THREE.BoxGeometry(0.55,0.055,0.1),boardFaceMats[0]);
+const heldWindow=makeWindow();heldWindow.scale.setScalar(0.22);
+heldWindow.traverse(o=>{if(o.isMesh)o.castShadow=false;});
+const heldAxe=makeToolMesh('axe');
+const heldPick=makeToolMesh('pick');
+const heldStone=makeStone();heldStone.scale.setScalar(0.55);heldStone.castShadow=false;
+const heldTrolley=makeTrolleyMesh();
+heldTrolley.scale.setScalar(0.85);
+heldTrolley.traverse(o=>{if(o.isMesh)o.castShadow=false;});
+held.add(heldBrick,heldBoard,heldWindow,heldAxe,heldPick,heldStone,heldTrolley);
+held.position.set(0.32,-0.36,-0.62);
+held.rotation.set(0.2,-0.4,0.08);
+camera.add(held);
+let heldSwing=0;
+function updateHeld(){
+ heldBrick.visible=selMat==='brick'&&!trolleyCarried;
+ heldBoard.visible=selMat==='board'&&!trolleyCarried;
+ heldWindow.visible=selMat==='glass'&&!trolleyCarried;
+ heldAxe.visible=selMat==='axe'&&!trolleyCarried;
+ heldPick.visible=selMat==='pick'&&!trolleyCarried;
+ heldStone.visible=selMat==='stone'&&!trolleyCarried;
+ heldTrolley.visible=trolleyCarried;
+}
+updateHeld();
+const hintEl=$('hint');
+hintEl.style.cssText='position:absolute;left:50%;bottom:92px;transform:translateX(-50%);background:rgba(46,227,139,.92);color:#06251a;border-radius:12px;padding:7px 14px;font-size:12.5px;font-weight:900;display:none;pointer-events:none';
+function updateHint(){
+ let t='';
+ if(nearGarage())t=trolleyCarried?'Действие — убрать тележку в гараж':'Действие — взять тележку';
+ else if(nearestNPC()<3)t='Действие — поговорить с Тимофеем';
+ else{
+  for(const n of neighbors){
+   if(Math.hypot(n.g.position.x-player.x,n.g.position.z-player.z)<2.6){t='Действие — поговорить с '+n.name;break;}
+  }
+ }
+ if(!t&&Math.hypot(SHOP_NPC.x-player.x,SHOP_NPC.z-player.z)<3)t='Действие — магазин Валентины';
+ if(!t&&Math.hypot(PLANT_REF().x-player.x,(PLANT_REF().z+1.5)-player.z)<3.2)t='Действие — кирпичный завод (камень → кирпич)';
+ if(!t&&jobActive){
+  if(carrying||carryCount>0){
+   const n=carrying?1:carryCount;
+   t=Math.hypot(ZONE.x-player.x,ZONE.z-player.z)<2.6
+    ?'Действие — сдать груз (+'+(n*payPerBox())+' ₽)'
+    :(carryCount>1?'Вези тележку к зелёному кольцу ('+carryCount+' ящ.)':'Неси ящик к зелёному кольцу');
+  }else if(nearestJobBox())t='Действие — '+(trolleyCarried?'загрузить ящик на тележку':'взять ящик');
+  else t='Ящики у общежития — осталось '+boxesLeft;
+ }
+ if(!t){
+  const lt=nearestLandedTree();
+  if(lt)t='Действие — собрать доски (+6)';
+  else if(Math.hypot(SELL_POS.x-player.x,SELL_POS.z-player.z)<6){
+   const a=houseAppraisal();
+   t=a.count>=8?'Действие — продать дом (+'+(a.total*2)+' ₽)':'На участке деталей: '+a.count+' (нужно 8+)';
+  }
+ }
+ hintEl.style.display=t?'block':'none';
+ if(t)hintEl.textContent=t;
+}
+const mapCv=$('mapCv'),mg=mapCv.getContext('2d');
+let mapOpen=false;
+function toggleMap(){
+ mapOpen=!mapOpen;
+ $('mapWrap').style.display=mapOpen?'flex':'none';
+ if(mapOpen){drawMap();sfx(660,0.08,'sine',0.04);}
+}
+function drawMap(){
+ const S=mapCv.width,R2=70;
+ const sc=S/(2*R2);
+ const px=x=>(x+R2)*sc,pz=z=>(z+R2)*sc;
+ mg.fillStyle='#4a7a35';mg.fillRect(0,0,S,S);
+ mg.fillStyle='#5c8a3c';
+ for(let i=0;i<40;i++){mg.beginPath();mg.arc(Math.random()*S,Math.random()*S,4+Math.random()*10,0,7);mg.fill();}
+ mg.fillStyle='#67a44e';
+ mg.fillRect(px(-27),pz(3),16*sc,12*sc);
+ mg.fillStyle='#3a3f46';
+ mg.fillRect(0,pz(-3),S,6*sc);
+ mg.fillRect(px(-2),pz(4),4*sc,28*sc);
+ mg.fillStyle='#8a6b42';
+ mg.fillRect(px(-64),pz(7),18*sc,3.2*sc);
+ mg.fillRect(px(-72),pz(8),3.2*sc,24*sc);
+ mg.fillRect(px(55),pz(-11.5),30*sc,3.5*sc);
+ mg.fillStyle='#f0f0e0';
+ for(let x=-64;x<=64;x+=8)mg.fillRect(px(x),pz(-0.2),2*sc,0.4*sc);
+ mg.fillStyle='#cfd4da';mg.fillRect(px(-25),pz(-15),10*sc,8*sc);
+ mg.fillStyle='#b55b3c';mg.fillRect(px(-6),pz(-15.5),12*sc,9*sc);
+ mg.fillStyle='#9a5f3f';mg.fillRect(px(10),pz(-19),8*sc,5*sc);
+ mg.fillStyle='#4a7a9a';mg.fillRect(px(25),pz(-6.6),4.4*sc,3.2*sc);
+ mg.fillStyle='#7a8288';mg.fillRect(px(9),pz(28),3*sc,4*sc);
+ mg.fillStyle='#5a6270';mg.fillRect(px(18),pz(-4.6),4*sc,2.4*sc);
+ mg.fillStyle='#7fae57';mg.fillRect(px(-6),pz(24),12*sc,12*sc);
+ mg.fillStyle='#2f6b2a';
+ [[30,8],[34,-6],[-30,10],[-34,-4],[26,-14],[-26,16],[-32,24],[30,26]].forEach(p=>{mg.beginPath();mg.arc(px(p[0]),pz(p[1]),3,0,7);mg.fill();});
+ FOREST_SPOTS.forEach(p=>{mg.beginPath();mg.arc(px(p[0]),pz(p[1]),4,0,7);mg.fill();});
+ mg.fillStyle='#8d9298';
+ ROCK_SPOTS.forEach(p=>{mg.beginPath();mg.arc(px(p[0]),pz(p[1]),4,0,7);mg.fill();});
+ mg.font='bold 10px sans-serif';mg.textAlign='center';
+ mg.fillStyle='#fff';
+ mg.fillText('МЭРИЯ · БИРЖА',px(-20),pz(-11)+3);
+ mg.fillText('ОБЩЕЖИТИЕ',px(0),pz(-11)+14);
+ mg.fillText('АВТОВОКЗАЛ',px(20),pz(-3.4)+3);
+ mg.fillText('УЧАСТОК',px(0),pz(30)+3);
+ mg.fillStyle='#a0d0ff';
+ mg.fillText('МАГАЗИН',px(27),pz(-4)+3);
+ mg.fillStyle='#c8ffb0';
+ mg.fillText('ЛЕС 🪓',px(-92),pz(20)+3);
+ mg.fillStyle='#ffe0a0';
+ mg.fillText('ЗАВОД 🧱',px(14),pz(-15)+3);
+ mg.fillText('КАРЬЕРА ⛏',px(80),pz(-10)+3);
+ mg.fillStyle='#b0c8e0';
+ mg.fillText('ГАРАЖ 🛒',px(11),pz(27)+3);
+ mg.fillStyle='#ffd86b';mg.font='bold 12px sans-serif';
+ mg.fillText('ZINI CITY',px(0),pz(-26));
+ mg.font='bold 9px sans-serif';mg.fillStyle='#eaffd0';
+ mg.fillText('ПАРК',px(PARK.x),pz(PARK.z)+3);
+ const carMx=Math.max(8,Math.min(S-8,px(carX))),carMz=pz(0);
+ mg.fillStyle='#d84a3a';
+ mg.fillRect(carMx-4,carMz-3,8,6);
+ const mx=Math.max(8,Math.min(S-8,px(player.x))),mz=Math.max(8,Math.min(S-8,pz(player.z)));
+ mg.save();
+ mg.translate(mx,mz);
+ mg.rotate(-yaw);
+ mg.fillStyle='#2ee38b';mg.strokeStyle='#0b2218';mg.lineWidth=2;
+ mg.beginPath();mg.moveTo(0,-9);mg.lineTo(6,7);mg.lineTo(-6,7);mg.closePath();mg.fill();mg.stroke();
+ mg.restore();
+}
+const hadSave=loadWorld();
+if(!hadSave)toast('ZINI CITY! Тимофей — работа, гараж — тележка, ночью платят больше 🌙');
+let lastTs=0,carHonked=false;
+function loop(ts){
+ requestAnimationFrame(loop);
+ const dt=Math.min(0.033,(ts-lastTs)/1000||0.016);lastTs=ts;
+ dayT=(dayT+dt/DAY_LEN)%1;
+ updateDayNight();
+ if(jobActive&&!dlgOpen){
+  jobTime-=dt;
+  if(jobTime<=0){jobTime=0;endJob(false);}
+  updateJobChip();
+  const pu=1+Math.sin(ts*0.004)*0.06;
+  zoneRing.scale.set(pu,pu,1);
+ }
+ flagCloth.rotation.y=Math.sin(ts*0.002)*0.3;
+ const fu=1+Math.sin(ts*0.006)*0.15;
+ fire.scale.set(0.95+Math.random()*0.1,fu,1);
+ fireLight.intensity=0.6+Math.random()*0.25;
+ for(const s of smoke){
+  s.p+=dt*0.12;
+  if(s.p>1)s.p=0;
+  s.m.position.set(17+Math.sin(ts*0.001+s.p*9)*0.6,7+s.p*7,-17);
+  s.m.material.opacity=0.5*(1-s.p);
+  const sc2=0.5+s.p*1.4;
+  s.m.scale.set(sc2,sc2,sc2);
+ }
+ fountain.jet.scale.set(1,1+Math.sin(ts*0.005)*0.15,1);
+ fountain.water.position.y=0.5+Math.sin(ts*0.002)*0.01;
+ for(const sw2 of swings){
+  const ang=Math.sin(ts*0.0025+sw2.phase)*0.45;
+  const prev=sw2.pivot.rotation.x;
+  sw2.pivot.rotation.x=ang;
+  if(Math.abs(ang)>0.43&&Math.abs(prev)<=0.43)creak();
+ }
+ const ahead=carDir>0?(player.x-carX):(carX-player.x);
+ const onRoad=Math.abs(player.z-0)<2.2;
+ if(ahead>0&&ahead<7&&onRoad&&Math.abs(player.z-car.position.z)<3){
+  if(carSpeed>0.3)carSpeed=0;
+  if(!carHonked){honk();carHonked=true;}
+ }else{
+  carSpeed=Math.min(8,carSpeed+6*dt);
+  if(carSpeed>3)carHonked=false;
+ }
+ carX+=carDir*carSpeed*dt;
+ if(carX>55){carX=55;carDir=-1;carHonked=false;}
+ if(carX<-55){carX=-55;carDir=1;carHonked=false;}
+ car.position.set(carX,0,0);
+ car.rotation.y=carDir>0?0:Math.PI;
+ for(const w of car.userData.wheels)w.rotation.x+=carSpeed*dt*3;
+ if(Math.abs(player.z-car.position.z)<1.3&&Math.abs(player.x-carX)<2.3){
+  player.z+=player.z>car.position.z?0.2:-0.2;
+ }
+ for(const t of chopTrees){
+  if(t.falling&&!t.landed){
+   t.fallP=Math.min(1,t.fallP+dt*0.8);
+   t.g.quaternion.setFromAxisAngle(t.axis,t.fallP*1.5);
+   if(t.fallP>=1){t.landed=true;t.g.position.y=0.25;}
+  }
+  if(t.shake>0){
+   t.shake=Math.max(0,t.shake-dt);
+   t.trunk.position.x=Math.sin(ts*0.05)*0.04*t.shake*3;
+  }
+ }
+ for(const r of rocks){
+  if(r.shake>0){
+   r.shake=Math.max(0,r.shake-dt);
+   r.m.rotation.z=Math.sin(ts*0.06)*0.06*r.shake*3;
+  }
+ }
+ const nd=nearestNPC();
+ if(nd<7){
+  npc.rotation.y=Math.atan2(player.x-NPC_POS.x,player.z-NPC_POS.z);
+  npc.children[0].position.y=1.05+Math.sin(ts*0.002)*0.015;
+ }
+  if(Math.hypot(SHOP_NPC.x-player.x,SHOP_NPC.z-player.z)<7){
+  shopNpc.rotation.y=Math.atan2(player.x-SHOP_NPC.x,player.z-SHOP_NPC.z);
+  shopNpc.children[0].position.y=1.05+Math.sin(ts*0.0021)*0.012;
+ }
+ updateNeighbors(dt,ts);
+ /* движение */
+ let ix=0,iz=0;
+ if(IS_TOUCH){ix=joyVec.x;iz=-joyVec.y;}
+ else{
+  if(keys.KeyW||keys.ArrowUp)iz+=1;
+  if(keys.KeyS||keys.ArrowDown)iz-=1;
+  if(keys.KeyA||keys.ArrowLeft)ix-=1;
+  if(keys.KeyD||keys.ArrowRight)ix+=1;
+  if(!locked){ix=0;iz=0;}
+ }
+ const mv=Math.hypot(ix,iz);
+ if(mv>0.08){
+  const s=Math.min(1,mv);
+  const fx=-Math.sin(yaw),fz=-Math.cos(yaw),rx=Math.cos(yaw),rz=-Math.sin(yaw);
+  player.x+=(fx*iz+rx*ix)*s*4.5*dt;
+  player.z+=(fz*iz+rz*ix)*s*4.5*dt;
+  bobT+=dt*8*s;
+ }else bobT+=dt*2;
+ vy-=GRAV*dt;player.y+=vy*dt;
+ resolveCollisions();
+ const sup=supportHeight();
+ if(player.y<=sup){player.y=sup;vy=0;onGround=true;}else onGround=false;
+ if(keys.Space&&onGround)vy=7.2;
+ player.x=Math.max(-240,Math.min(240,player.x));player.z=Math.max(-240,Math.min(240,player.z));
+ camera.position.set(player.x,player.y+EYE+Math.sin(bobT)*0.035,player.z);
+ camera.rotation.order='YXZ';
+ camera.rotation.set(pitch,yaw,0);
+ if(heldSwing>0)heldSwing=Math.max(0,heldSwing-dt*2.2);
+ const sw=heldSwing>0?Math.sin((0.3-heldSwing)/0.3*Math.PI)*0.7:0;
+ const walkSw=Math.sin(bobT)*0.05;
+ armR.rotation.x=-0.55-sw*0.9+walkSw;
+ armR.position.y=-0.42+Math.abs(Math.sin(bobT))*0.02;
+ armL.rotation.x=-0.5-walkSw*0.5;
+ armL.position.y=-0.42-Math.abs(Math.sin(bobT))*0.02;
+ held.position.set(0.32+Math.sin(bobT)*0.012,-0.36+Math.abs(Math.sin(bobT))*0.02,-0.62+sw*0.15);
+ held.rotation.set(0.2-sw*0.8,-0.4,0.08);
+ if(carryGroup.visible)carryGroup.position.y=-0.36+Math.abs(Math.sin(bobT))*0.03;
+ if(carryStack.visible){
+  carryStack.position.set(-0.16,-0.3+Math.abs(Math.sin(bobT))*0.02,-0.62);
+  carryStack.rotation.set(0.05,0.3,0);
+ }
+ updateHint();
+ updateHighlight(dt);
+ renderer.render(scene,camera);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
