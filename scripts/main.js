@@ -17,6 +17,12 @@ const houseModel = new THREE.Group();
 // Добавьте модели домов
 scene.add(houseModel);
 
+// Создаём модель дома
+const geometry = new THREE.BoxGeometry(10, 10, 10);
+const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+const house = new THREE.Mesh(geometry, material);
+houseModel.add(house);
+
 function animate() {
   requestAnimationFrame(animate);
   renderer.render(scene, camera);
