@@ -18,6 +18,8 @@ canvas{touch-action:none;display:block}
 #cross:before{left:8px;top:0;width:2px;height:18px}
 #cross:after{top:8px;left:0;width:18px;height:2px}
 #cross.hot:before,#cross.hot:after{background:#ff5a3a;box-shadow:0 0 5px #ff5a3a}
+#hpBar{position:absolute;top:46px;left:12px;width:170px;height:16px;background:rgba(10,20,40,.75);border:1px solid rgba(255,255,255,.25);border-radius:9px;padding:2px;box-sizing:border-box}
+#hpFill{width:100%;height:100%;background:#44e05a;border-radius:7px;transition:width .2s,background .2s}
 #hotbar{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:6px;pointer-events:auto;max-width:96vw;overflow-x:auto}
 .hchip{background:rgba(12,22,44,.85);color:#fff;border:2px solid rgba(255,255,255,.25);border-radius:12px;padding:7px 11px;font-size:12px;font-weight:800;cursor:pointer;min-width:76px;text-align:center;flex-shrink:0}
 .hchip.on{border-color:#7ef2ff;box-shadow:0 0 12px rgba(126,242,255,.6)}
@@ -62,8 +64,10 @@ body.touch #tip{display:none}
   <div class="chip" id="dayChip">☀ 12:00</div>
   <div class="chip" id="jobChip" style="display:none">📦 0/5 · 2:00</div>
   <div class="chip" id="ammoChip" style="display:none">🔫 0/0</div>
+  <div class="chip" id="waveChip" style="display:none">🎯 ВОЛНА 1 · 0</div>
   <div class="chip" id="modeChip">🔨 СТРОЙКА</div>
  </div>
+ <div id="hpBar"><div id="hpFill"></div></div>
  <div id="cross"></div>
  <div id="hint"></div>
  <div id="hotbar"></div>
@@ -93,7 +97,7 @@ body.touch #tip{display:none}
 </div>
 <script>
 'use strict';
-/* ===== ZINI CITY — Спринт 12: стрелковый полигон, пистолет, автомат ===== */
+/* ===== ZINI CITY — Спринты 13–15: арена, босс и аптечки, вертодром и полёты ===== */
 const $=id=>document.getElementById(id);
 const IS_TOUCH=('ontouchstart' in window)||navigator.maxTouchPoints>0;
 if(IS_TOUCH)document.body.classList.add('touch');
@@ -111,7 +115,6 @@ function chopSfx(){sfx(110,0.14,'square',0.06);setTimeout(()=>sfx(70,0.16,'sine'
 function mineSfx(){sfx(180,0.08,'square',0.05);setTimeout(()=>sfx(120,0.1,'square',0.04),50);}
 function honk(){sfx(420,0.25,'square',0.06);setTimeout(()=>sfx(390,0.2,'square',0.05),260);}
 function creak(){sfx(240,0.3,'sawtooth',0.02);}
-/* звуки оружия */
 function shotSfx(smg){
  if(smg){sfx(210,0.09,'square',0.08);setTimeout(()=>sfx(130,0.11,'sawtooth',0.05),20);}
  else{sfx(240,0.13,'square',0.09);setTimeout(()=>sfx(110,0.18,'sawtooth',0.06),30);}
@@ -119,14 +122,21 @@ function shotSfx(smg){
 function hitTargetSfx(){sfx(980,0.09,'triangle',0.06);setTimeout(()=>sfx(1420,0.1,'triangle',0.05),60);}
 function emptySfx(){sfx(320,0.05,'square',0.04);}
 function reloadSfx(){sfx(500,0.06,'square',0.05);setTimeout(()=>sfx(380,0.07,'square',0.05),110);}
+/* звуки арены */
+function botShotSfx(){sfx(190,0.08,'square',0.05);}
+function hitBotSfx(){sfx(280,0.06,'square',0.05);}
+function botDieSfx(){sfx(130,0.18,'sawtooth',0.05);setTimeout(()=>sfx(90,0.22,'sine',0.04),80);}
+function playerHurtSfx(){sfx(300,0.12,'sawtooth',0.06);}
+function bossSfx(){sfx(70,0.5,'sawtooth',0.08);setTimeout(()=>sfx(60,0.5,'sawtooth',0.06),400);}
+function healSfx(){sfx(660,0.1,'sine',0.05);setTimeout(()=>sfx(880,0.12,'sine',0.05),100);}
 window.addEventListener('pointerdown',()=>ac());
-/* рыбалка и лодка: состояние рано */
+/* рыбалка и лодка: состояние рано — чтобы премия мэра видела улов */
 let rodHave=localStorage.getItem('mg_rod')==='1';
 let fishN=parseInt(localStorage.getItem('mg_fish')||'0',10);
 let fishState=0,fishT=0;
 let boatHave=localStorage.getItem('mg_boat')==='1';
 let sailing=false;
-/* оружие и патроны (Спринт 12) */
+/* оружие и патроны */
 let gunHave=localStorage.getItem('mg_gun')==='1';
 let smgHave=localStorage.getItem('mg_smg')==='1';
 let ammoP=parseInt(localStorage.getItem('mg_ammoP')||'0',10);
@@ -142,6 +152,26 @@ function updAmmoChip(){
  if(smgHave)$('ammoChip').textContent='🔫 АВТОМАТ '+ammoS;
  else $('ammoChip').textContent='🔫 ПИСТОЛЕТ '+ammoP;
 }
+/* арена (Спринты 13–14): здоровье, волны, очки */
+let arenaActive=false;
+let playerHP=100;const MAX_HP=100;
+let survivalScore=0,waveNum=0,arenaFrags=0;
+let bestScore=parseInt(localStorage.getItem('mg_best')||'0',10);
+function updHPBar(){
+ const pct=(playerHP/MAX_HP)*100;
+ const f=$('hpFill');
+ f.style.width=pct+'%';
+ f.style.background=pct>50?'#44e05a':(pct>25?'#ffd83a':'#ff4a3a');
+}
+function updWaveChip(){
+ const el=$('waveChip');
+ el.style.display=arenaActive?'':'none';
+ if(arenaActive)el.textContent='🎯 ВОЛНА '+Math.max(1,waveNum)+' · '+survivalScore+' очк.';
+}
+updHPBar();
+/* вертодром (Спринт 15) */
+let heliOwned=localStorage.getItem('mg_heli')==='1';
+let flying=false,landingNow=false,tourActive=false,tourT=0;
 let money=parseInt(localStorage.getItem('mg_money')||'500',10);
 function setMoney(v){
  money=v;localStorage.setItem('mg_money',String(v));
@@ -370,6 +400,7 @@ const frameTex=makeTex(128,(g,s)=>{
 const frameBump=makeTex(128,(g,s)=>{
  g.fillStyle='#b8b8b8';g.fillRect(0,0,s,s);noise(g,s,100,0.12);
 });
+const windowFrameMat=new THREE.MeshStandardMaterial({map:frameTex,bumpMap:frameBump,bumpScale:0.02,roughness:0.8});
 const stoneTex=makeTex(384,(g,s)=>{
  g.fillStyle='#8d9298';g.fillRect(0,0,s,s);
  for(let i=0;i<64;i++){
@@ -478,6 +509,15 @@ const targetTex=makeTex(256,(g,s)=>{
  g.beginPath();g.arc(s/2,s/2,s*0.035,0,7);g.fill();
  noise(g,s,140,0.08);
 });
+/* аптечка: белый ящик с зелёным крестом (Спринт 14) */
+const medkitTex=makeTex(128,(g,s)=>{
+ g.fillStyle='#f0f2f4';g.fillRect(0,0,s,s);
+ g.strokeStyle='#c8ccd0';g.lineWidth=4;g.strokeRect(6,6,s-12,s-12);
+ g.fillStyle='#2ec85a';
+ g.fillRect(s/2-12,26,24,s-52);
+ g.fillRect(26,s/2-12,s-52,24);
+ noise(g,s,60,0.08);
+});
 const boardFaceMats=Array.from({length:4},()=>new THREE.MeshStandardMaterial({map:plankFaceMake(),bumpMap:plankBump,bumpScale:0.04,roughness:0.85}));
 const boardSideMat=new THREE.MeshStandardMaterial({map:plankSideTex,bumpMap:plankBump,bumpScale:0.03,roughness:0.9});
 const boardEndMat=new THREE.MeshStandardMaterial({map:endGrainTex,roughness:0.95});
@@ -531,6 +571,7 @@ dirt(70,-10,3.5,30);
 dirt(115,45,4,110);
 dirt(198,-24,3,20);dirt(202,-12,4,14);
 dirt(96,-9,3.2,16);
+dirt(97,-30,3,12);
 const geoCache={};
 function roundedBox(w,h,d,r){
  const k=w+'_'+h+'_'+d+'_'+r;
@@ -642,6 +683,7 @@ lamp(3.5,-4.5,true);lamp(-3.5,6,false);lamp(3.5,18,true);lamp(-3.5,24,false);
 lamp(7.5,24,true);
 lamp(150,40,true);lamp(190,52,true);
 lamp(88,-12,true);
+lamp(97,-26,true);
 const plot=new THREE.Mesh(new THREE.PlaneGeometry(12,12),matOf(0x7fae57));
 plot.rotation.x=-Math.PI/2;plot.position.set(0,0.02,30);plot.receiveShadow=true;plot.userData.plot=true;scene.add(plot);pickables.push(plot);
 function fenceLine(x1,z1,x2,z2){
@@ -707,6 +749,7 @@ sign('ZINI CITY',0,7.4,-24);
 sign('ЛЕС · ЛЕСОРУБКА',-88,3.4,2,0.7);
 sign('КАРЬЕРА',82,2.4,-10,0.7);
 sign2('ПОЛИГОН',94,3.4,-14,0.66);
+sign2('АРЕНА · ОПАСНО',100,4.2,-40,0.72);
 sign2('КИРПИЧНЫЙ ЗАВОД',14,4.6,-15.5,0.62);
 sign2('СТРОЙМАТЕРИАЛЫ',27,3.7,-3.6,0.6);
 sign2('СДАЧА ДОМА',0,2.5,33,0.56);
@@ -789,7 +832,7 @@ function addNeighbor(name,a,b,speed,o,dlgKey){
  sign(name.toUpperCase(),a.x,2.4,a.z,0.5);
 }
 addNeighbor('Анна',{x:-10,z:26},{x:-4.5,z:28.5},0.6,{shirt:0xd06aa8,pants:0x8a3a66,hair:0x8a5a2a,bow:0xffd0e0},'anna');
-addNeighbor('Пётr',{x:6,z:33},{x:9,z:28.5},0.5,{shirt:0x4a8a4a,pants:0x3a4a3a,hat:0x2a6a3a,hair:0x4a4a4a},'petr');
+addNeighbor('Пётр',{x:6,z:33},{x:9,z:28.5},0.5,{shirt:0x4a8a4a,pants:0x3a4a3a,hat:0x2a6a3a,hair:0x4a4a4a},'petr');
 function updateNeighbors(dt,ts){
  for(const n of neighbors){
   const near=Math.hypot(n.g.position.x-player.x,n.g.position.z-player.z);
@@ -1208,25 +1251,19 @@ const octo=(function(){
 /* ===== СПРИНТ 12: СТРЕЛКОВЫЙ ПОЛИГОН ===== */
 const RANGE=new THREE.Vector3(100,0,-16);
 (function(){
- /* земля тира */
  const ground=new THREE.Mesh(new THREE.PlaneGeometry(22,30),matOf(0x9a8a60));
  ground.rotation.x=-Math.PI/2;ground.position.set(RANGE.x,0.02,RANGE.z);
  ground.receiveShadow=true;ground.userData.ground=true;scene.add(ground);
- /* задний вал */
  addSolidBoxY(RANGE.x,1.5,RANGE.z-13,24,3,1.4,0x6a5a40,0.3);
- /* боковые стены */
  addSolidBoxY(RANGE.x-10,1.5,RANGE.z-2,1.2,3,24,0x6a5a40,0.3);
  addSolidBoxY(RANGE.x+10,1.5,RANGE.z-2,1.2,3,24,0x6a5a40,0.3);
- /* навес над огневой линией */
  addSolidBoxY(RANGE.x,3.2,RANGE.z+4,20,0.4,5,0x4a5a6a,0.2);
  [-8,0,8].forEach(px=>{
   const post=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.16,3.2,8),matOf(0x5a4a30));
   post.position.set(RANGE.x+px,1.6,RANGE.z+6);post.castShadow=true;scene.add(post);
   solids.push({minX:RANGE.x+px-0.2,maxX:RANGE.x+px+0.2,minY:0,maxY:3.2,minZ:RANGE.z+5.8,maxZ:RANGE.z+6.2});
  });
- /* стол стрельбы */
  addSolidBoxY(RANGE.x-1,0.5,RANGE.z+5,3,1,0.7,0x7a5a34,0.1);
- /* мишени */
 })();
 const RANGE_TARGETS=[];
 [[RANGE.x-7,RANGE.z-10],[RANGE.x-3.5,RANGE.z-10],[RANGE.x,RANGE.z-10],[RANGE.x+3.5,RANGE.z-10],[RANGE.x+7,RANGE.z-10]].forEach((p,i)=>{
@@ -1248,6 +1285,51 @@ const sergeyNpc=makePerson({shirt:0x3a7a3a,pants:0x2a3a2a,hat:0x2a5a2a,hair:0x6a
 sergeyNpc.position.copy(SERGEY);scene.add(sergeyNpc);
 solids.push({minX:SERGEY.x-0.4,maxX:SERGEY.x+0.4,minY:0,maxY:1.9,minZ:SERGEY.z-0.4,maxZ:SERGEY.z+0.4});
 sign('СЕРГЕЙ · МАСТЕР ПОЛИГОНА',SERGEY.x,2.5,SERGEY.z,0.6);
+/* ===== СПРИНТЫ 13–14: АРЕНА ===== */
+const ARENA=new THREE.Vector3(100,0,-52);
+const ARENA_RADIUS=26;
+let bots=[];
+let arenaBullets=[];
+let arenaFrags2=0;
+let bossRef=null;
+const arenaLights=[];
+const medkits=[];
+const wavePendingRef={pending:false,cd:0};
+let wavePending=false,waveCd=0;
+/* жёлтое кольцо арены */
+const arenaRing=new THREE.Mesh(new THREE.RingGeometry(ARENA_RADIUS-0.8,ARENA_RADIUS+0.8,48),new THREE.MeshBasicMaterial({color:0xffaa00,transparent:true,opacity:0.55,side:THREE.DoubleSide}));
+arenaRing.rotation.x=-Math.PI/2;arenaRing.position.set(ARENA.x,0.04,ARENA.z);scene.add(arenaRing);
+/* песчаный пол арены */
+const arenaGround=new THREE.Mesh(new THREE.CircleGeometry(ARENA_RADIUS,40),matOf(0xb8a070));
+arenaGround.rotation.x=-Math.PI/2;arenaGround.position.set(ARENA.x,0.03,ARENA.z);
+arenaGround.receiveShadow=true;arenaGround.userData.ground=true;scene.add(arenaGround);
+/* барьеры-укрытия: бетонные блоки */
+(function(){
+ const spots=[[-9,-6],[9,-6],[0,-14],[-14,4],[14,4],[-6,12],[6,12],[0,0]];
+ spots.forEach(p=>{
+  addSolidBoxY(ARENA.x+p[0],0.75,ARENA.z+p[1],2.6,1.5,0.9,0x8d9298,0.08);
+  const stripe=new THREE.Mesh(new THREE.BoxGeometry(2.62,0.3,0.92),matOf(0xd8a02f));
+  stripe.position.set(ARENA.x+p[0],1.35,ARENA.z+p[1]);scene.add(stripe);
+ });
+})();
+/* прожекторы арены */
+(function(){
+ [[-18,-14],[18,-14],[-18,10],[18,10]].forEach(p=>{
+  const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.12,5,8),matOf(0x3a4250));
+  pole.position.set(ARENA.x+p[0],2.5,ARENA.z+p[1]);pole.castShadow=true;scene.add(pole);
+  const head=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.5,0.4),new THREE.MeshStandardMaterial({color:0xfff2b0,emissive:0xffe08a,emissiveIntensity:0.35}));
+  head.position.set(ARENA.x+p[0],5.1,ARENA.z+p[1]);scene.add(head);
+  const li=new THREE.PointLight(0xffe8b0,0,20);
+  li.position.set(ARENA.x+p[0],5,ARENA.z+p[1]);scene.add(li);
+  arenaLights.push(li);
+  solids.push({minX:ARENA.x+p[0]-0.15,maxX:ARENA.x+p[0]+0.15,minY:0,maxY:5,minZ:ARENA.z+p[1]-0.15,maxZ:ARENA.z+p[1]+0.15});
+ });
+})();
+/* триггер входа: красная плита у южного края */
+const ARENA_GATE=new THREE.Vector3(ARENA.x,0,ARENA.z+ARENA_RADIUS+2);
+const arenaGate=new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.1,0.06,20),new THREE.MeshStandardMaterial({color:0xd84a3a,emissive:0xd84a3a,emissiveIntensity:0.5}));
+arenaGate.rotation.x=-Math.PI/2;arenaGate.position.set(ARENA_GATE.x,0.05,ARENA_GATE.z);scene.add(arenaGate);
+sign2('ВОЙТИ НА АРЕНУ',ARENA_GATE.x,2,ARENA_GATE.z,0.6);
 /* ===== АВТОМАШИНА ===== */
 const car=new THREE.Group();
 const carHeadMats=[],carTailMats=[];
@@ -1381,7 +1463,6 @@ function tryMine(){
 }
 const qY90=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),Math.PI/2);
 const qZ90=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI/2);
-const windowFrameMat=new THREE.MeshStandardMaterial({map:frameTex,bumpMap:frameBump,bumpScale:0.02,roughness:0.8});
 function makeBrick(){
  const m=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.14,0.25),brickMatsArr());
  m.castShadow=true;m.receiveShadow=true;return m;
@@ -1485,9 +1566,11 @@ function removePiece(p){
  const qi=pickables.indexOf(p.mesh);if(qi>=0)pickables.splice(qi,1);
 }
 function saveWorld(){
+ let px=player.x,py=player.y,pz=player.z,py_=yaw;
+ if(flying||tourActive){px=HELIPAD.x;py=1.25;pz=HELIPAD.z;}
  const data=pieces.map(p=>({t:p.t,x:p.mesh.position.x,y:p.mesh.position.y,z:p.mesh.position.z,
   q:[p.mesh.quaternion.x,p.mesh.quaternion.y,p.mesh.quaternion.z,p.mesh.quaternion.w]}));
- try{localStorage.setItem('mg_world',JSON.stringify({p:data,pl:[player.x,player.y,player.z],y:yaw,pt:pitch,i:inv,tr:trolleyCarried?1:0}));}catch(e){}
+ try{localStorage.setItem('mg_world',JSON.stringify({p:data,pl:[px,py,pz],y:py_,pt:pitch,i:inv,tr:trolleyCarried?1:0}));}catch(e){}
 }
 function loadWorld(){
  try{
@@ -1511,9 +1594,12 @@ function loadWorld(){
    heldTrolley.visible=true;
   }
   if(s&&s.pl){
-   const lx=s.pl[0],lz=s.pl[2];
+   const lx=s.pl[0],ly=s.pl[1],lz=s.pl[2];
    const onPier=lx>140&&lx<215&&lz>35&&lz<55;
-   if(lx>140&&!onPier)player.set(BOAT_POS.x,0,BOAT_POS.z-1.5);
+   const inArena=Math.hypot(lx-ARENA.x,lz-ARENA.z)<ARENA_RADIUS+4;
+   if(inArena)player.set(ARENA_GATE.x,0,ARENA_GATE.z+2);
+   else if(ly>5)player.set(HELIPAD.x,1.25,HELIPAD.z);
+   else if(lx>140&&!onPier)player.set(BOAT_POS.x,0,BOAT_POS.z-1.5);
    else player.set(s.pl[0],s.pl[1],s.pl[2]);
   }
   if(s&&s.y!==undefined)yaw=s.y;
@@ -1542,6 +1628,14 @@ function resolveCollisions(){
     const m=Math.min(ox1,ox2,oz1,oz2);
     if(m===ox1)player.x=b.minX-R;else if(m===ox2)player.x=b.maxX+R;else if(m===oz1)player.z=b.minZ-R;else player.z=b.maxZ+R;
    }
+  }
+ }
+ for(const b of bots){
+  const dx=player.x-b.x,dz=player.z-b.z;
+  const d=Math.hypot(dx,dz);
+  if(d<0.9&&d>0.001){
+   player.x=b.x+dx/d*0.9;
+   player.z=b.z+dz/d*0.9;
   }
  }
 }
@@ -1633,7 +1727,7 @@ renderer.domElement.addEventListener('pointerup',ptrEnd,{passive:false});
 renderer.domElement.addEventListener('pointercancel',ptrEnd,{passive:false});
 function bindBtn(id,fn){
  const el=$(id);
- el.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();if(!dlgOpen&&!mapOpen){fn();}});
+ el.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();if(!dlgOpen&&!mapOpen)fn();});
  el.addEventListener('pointerup',()=>{if(id==='actBtn')touchFireHeld=false;});
 }
 bindBtn('jumpBtn',()=>{if(onGround)vy=7.2;});
@@ -1680,11 +1774,6 @@ function payPerBox(){
  const base=dayF()<0.4?45:30;
  return rainF>0.5?base+10:base;
 }
-function updateJobChip(){
- const tot=jobType==='port'?6:5;
- const m=Math.floor(jobTime/60),s=Math.floor(jobTime%60);
- $('jobChip').textContent='📦 '+(tot-boxesLeft)+'/'+tot+' · '+m+':'+(s<10?'0':'')+s;
-}
 function updateDayNight(){
  const h=Math.sin(dayT*Math.PI*2);
  const df=dayF();
@@ -1708,6 +1797,7 @@ function updateDayNight(){
   L.cap.emissiveIntensity=lampsOn?1.0:0.25;
   if(L.li)L.li.visible=lampsOn;
  }
+ arenaLights.forEach(li=>{li.visible=lampsOn||arenaActive;});
  carHeadMats.forEach(m=>m.emissiveIntensity=lampsOn?1.6:0.6);
  carTailMats.forEach(m=>m.emissiveIntensity=lampsOn?1.2:0.5);
  const hh=Math.floor((dayT*24+6)%24),mm=Math.floor((((dayT*24+6)%24)%1)*60);
@@ -1730,7 +1820,7 @@ function openDialog(mode,who){
  dlgMode=mode;dlgWho=who||null;
  dlgOpen=true;
  $('dlg').style.display='flex';
- const names={npc:'БИРЖА ТРУДА · Тимофей',shop:'СТРОЙМАТЕРИАЛЫ · Валентина',anna:'СОСЕДКА · Анна',petr:'СОСЕД · Пётр',market:'РЫНОК · МАРИЯ',port:'ПОРТ · МАСТЕР БОРИС',bus:'АВТОБУС №7',fedor:'МАЯК · РЫБАК ФЁДОР',plant:'КИРПИЧНЫЙ ЗАВОД ZINI BRICK',sergey:'ПОЛИГОН · МАСТЕР СЕРГЕЙ'};
+ const names={npc:'БИРЖА ТРУДА · Тимофей',shop:'СТРОЙМАТЕРИАЛЫ · Валентина',anna:'СОСЕДКА · Анна',petr:'СОСЕД · Пётр',market:'РЫНОК · МАРИЯ',port:'ПОРТ · МАСТЕР БОРИС',bus:'АВТОБУС №7',fedor:'МАЯК · РЫБАК ФЁДОР',plant:'КИРПИЧНЫЙ ЗАВОД ZINI BRICK',sergey:'ПОЛИГОН · МАСТЕР СЕРГЕЙ',arena:'АРЕНА ZINI'};
  $('dlgName').textContent=who||names[mode]||'ZINI CITY';
  renderDialog();
  if(document.pointerLockElement)document.exitPointerLock();
@@ -1752,7 +1842,18 @@ function buy(k){
 }
 function renderDialog(){
  const btns=$('dlgBtns');btns.innerHTML='';
- if(dlgMode==='bus'){
+ if(dlgMode==='arena'){
+  $('dlgText').textContent='Табличка у входа: «Сражайся волнами! За фраг — 15 ₽, за босса — 100 ₽. Каждая третья волна — босс с очередями. Зелёные ящики — аптечки +25 HP. Рекорд выживания: '+bestScore+' очк. Выход — по красной плите у южного края».';
+  if(!gunHave&&!smgHave){
+   const w=document.createElement('button');w.className='dbtn';
+   w.textContent='Без оружия страшно… (подсказка)';
+   w.onclick=()=>{toast('Сходи к Сергею на полигон — он выдаёт пистолет бесплатно 🔫');renderDialog();};
+   btns.appendChild(w);
+  }
+  const b=document.createElement('button');b.className='dbtn good';b.textContent='Войти на арену!';
+  b.onclick=()=>{closeDialog();enterArena();};
+  btns.appendChild(b);
+ }else if(dlgMode==='bus'){
   const toPort=Math.hypot(CITY_BUS_POS.x-player.x,CITY_BUS_POS.z-player.z)<6;
   $('dlgText').textContent='Автобус №7: «Восточный» — город. Проезд 20 ₽, оплата на месте. Багаж до 5 ящиков на тележке везём бесплатно 🙂';
   const b=document.createElement('button');b.className='dbtn';
@@ -1761,7 +1862,7 @@ function renderDialog(){
   b.onclick=()=>busRide(toPort);
   btns.appendChild(b);
  }else if(dlgMode==='sergey'){
-  $('dlgText').textContent='Сергей: Добро пожаловать на полигон, '+NICK+'! Правила простые: пистолет — за глаз, патроны — в стол, мишени — вверх. Центр «яблочко» даёт 5 очков, дальше меньше. За каждое очко — 2 ₽. Стреляй по кнопке Действия, автомат — зажми!';
+  $('dlgText').textContent='Сергей: Добро пожаловать на полигон, '+NICK+'! Правила простые: пистолет — за глаз, патроны — в стол, мишени — вверх. Центр «яблочко» даёт 5 очков, дальше меньше. За каждое очко — 2 ₽. А на арене за карьером теперь горячо — боты там злые, бери патроны побольше.';
   if(!gunHave){
    const b=document.createElement('button');b.className='dbtn good';b.textContent='Получить пистолет (бесплатно)';
    b.onclick=()=>{
@@ -1830,7 +1931,7 @@ function renderDialog(){
   const gift=localStorage.getItem(dlgMode==='anna'?'mg_gift_anna':'mg_gift_petr');
   const line=dlgMode==='anna'
    ?('Привет, '+NICK+'! Ты новосёл с этого участка? Какой простор! Держи на новоселье монету — и заходи в парк, там качели и фонтан 🙂')
-   :('О, сосед! На полигоне у Сергея теперь стреляют — гремит на весь карьер. Говорят, за очки платят честно. И лодку у Бориса посмотри — остров песчаный манит!');
+   :('О, сосед! За карьером теперь арена — стрельба гремит по ночам. За фраги платят по 15 ₽, а за босса — сотку! Аптечки там береги — зелёные ящики спасают.');
   $('dlgText').textContent=line;
   if(!gift){
    const b=document.createElement('button');b.className='dbtn';
@@ -1876,7 +1977,7 @@ function renderDialog(){
   $('dlgText').textContent='Смена идёт! Осталось ящиков: '+boxesLeft+(trolleyCarried?' — с тележкой грузи все разом!':'. Носи по одному или возьми тележку в гараже.');
   const b=document.createElement('button');b.className='dbtn alt';b.textContent='Завершить смену досрочно';b.onclick=()=>{closeDialog();endJob(false);};btns.appendChild(b);
  }else{
-  $('dlgText').textContent='Здравствуй, '+NICK+'! Смена грузчика: 5 ящиков — 30 ₽ (ночью 45 ₽, в дождь +10 ₽), бонус 50 ₽. В порту — 50 ₽ за ящик. На полигоне за очки платят, на острове песок продают!';
+  $('dlgText').textContent='Здравствуй, '+NICK+'! Смена грузчика: 5 ящиков — 30 ₽ (ночью 45 ₽, в дождь +10 ₽), бонус 50 ₽. В порту — 50 ₽ за ящик. На полигоне за очки платят, арена зовёт храбрых, а пилот Марго зовёт в небо!';
   const b=document.createElement('button');b.className='dbtn';b.textContent='Устроиться на смену ('+payPerBox()+' ₽/ящик)';b.onclick=()=>{closeDialog();startJob();};btns.appendChild(b);
  }
  const c=document.createElement('button');c.className='dbtn alt';c.textContent='Закрыть';c.onclick=closeDialog;btns.appendChild(c);
@@ -1999,6 +2100,7 @@ const GUN_MAG=12,SMG_MAG=30;
 let magP=parseInt(localStorage.getItem('mg_magP')||'12',10);
 let magS=parseInt(localStorage.getItem('mg_magS')||'0',10);
 let reloading=false,reloadT=0;
+let smgCd=0;
 function saveMags(){
  localStorage.setItem('mg_magP',String(magP));
  localStorage.setItem('mg_magS',String(magS));
@@ -2016,10 +2118,10 @@ function spawnCasing(){
 }
 function fireGun(){
  const isSmg=selMat==='smg';
- const mag=isSmg?magS:magP,ammo=isSmg?ammoS:ammoP;
- if(!isSmg&&mag<=0&&ammo<=0){emptySfx();toast('Патроны кончились — Сергей продаёт');return;}
+ const mag=isSmg?magS:magP;
  if(reloading)return;
  if(mag<=0){
+  if((isSmg?ammoS:ammoP)<=0){emptySfx();toast('Патроны кончились — Сергей продаёт');return;}
   reloading=true;reloadT=isSmg?1.6:1.2;
   reloadSfx();return;
  }
@@ -2029,7 +2131,7 @@ function fireGun(){
  spawnCasing();
  heldSwing=0.3;
  pitch+=isSmg?0.02:0.035;
- const dir=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+ if(arenaActive){arenaPlayerShot(isSmg);return;}
  ray.setFromCamera(V2,camera);
  ray.far=90;
  const tHits=ray.intersectObjects(RANGE_TARGETS.filter(t=>!t.down).map(t=>t.board),false);
@@ -2055,12 +2157,293 @@ function fireGun(){
    toast(desc);
   }
  }else{
-  const wallHits=ray.intersectObjects(statics,false);
   sfx(150,0.06,'square',0.03);
  }
  ray.far=7;
 }
 setInterval(saveMags,5000);
+/* ===== АРЕНА: боты, волны, босс, аптечки (Спринты 13–14) ===== */
+const BOT_FRAG_RUB=15,BOSS_FRAG_RUB=100;
+const botMats={
+ body:new THREE.MeshStandardMaterial({color:0xc03a2a,roughness:0.8}),
+ head:new THREE.MeshStandardMaterial({color:0x2a2a30,roughness:0.7}),
+ boss:new THREE.MeshStandardMaterial({color:0x8a1410,roughness:0.6,emissive:0x400000,emissiveIntensity:0.4})
+};
+function makeBotMesh(boss){
+ const g=new THREE.Group();
+ const bm=boss?botMats.boss:botMats.body;
+ const body=new THREE.Mesh(roundedBox(boss?1.2:0.6,boss?1.3:0.85,boss?0.7:0.4,0.1),bm);
+ body.position.y=boss?1.35:1.05;body.castShadow=true;g.add(body);
+ const head=new THREE.Mesh(new THREE.SphereGeometry(boss?0.42:0.24,12,10),botMats.head);
+ head.position.y=boss?2.35:1.72;head.castShadow=true;g.add(head);
+ const eyeMat=new THREE.MeshStandardMaterial({color:0xffe040,emissive:0xffc020,emissiveIntensity:1.2});
+ [-1,1].forEach(s=>{
+  const e=new THREE.Mesh(new THREE.SphereGeometry(boss?0.09:0.05,8,6),eyeMat);
+  e.position.set(s*(boss?0.16:0.09),head.position.y+0.02,boss?0.38:0.2);
+  g.add(e);
+ });
+ [-1,1].forEach(s=>{
+  const arm=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.055,boss?0.9:0.55,6),bm);
+  arm.position.set(s*(boss?0.75:0.38),body.position.y-0.05,0.05);
+  arm.rotation.x=-0.9;
+  arm.castShadow=true;g.add(arm);
+  const gunB=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.08,boss?0.6:0.4),matOf(0x2a2a30));
+  gunB.position.set(s*(boss?0.75:0.38),body.position.y-0.18,boss?0.62:0.42);
+  g.add(gunB);
+ });
+ [-1,1].forEach(s=>{
+  const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.075,boss?0.95:0.65,6),bm);
+  leg.position.set(s*(boss?0.32:0.16),boss?0.48:0.34,0);
+  leg.castShadow=true;g.add(leg);
+ });
+ g.traverse(m=>{if(m.isMesh)m.castShadow=true;});
+ return g;
+}
+function spawnBotAt(boss){
+ const a=Math.random()*Math.PI*2;
+ const rr=(ARENA_RADIUS-3)*(0.75+Math.random()*0.25);
+ const bx=ARENA.x+Math.cos(a)*rr,bz=ARENA.z+Math.sin(a)*rr;
+ const g=makeBotMesh(boss);
+ g.position.set(bx,0,bz);
+ g.rotation.y=Math.atan2(player.x-bx,player.z-bz);
+ scene.add(g);
+ const bot={g,boss,hp:boss?90:20,x:bx,z:bz,cd:0.6+Math.random()*1.2,strafe:Math.random()<0.5?1:-1,shakeT:0};
+ bots.push(bot);
+ if(boss){bossRef=bot;bossSfx();}
+ return bot;
+}
+function spawnWave(){
+ waveNum++;
+ const n=Math.min(3+waveNum,8);
+ const isBossWave=waveNum%3===0;
+ for(let i=0;i<n;i++)spawnBotAt(false);
+ if(isBossWave)spawnBotAt(true);
+ spawnMedkits(waveNum%2===0?2:1);
+ updWaveChip();
+ if(isBossWave)toast('⚠ ВОЛНА '+waveNum+': БОСС на арене! Стреляй в него!');
+ else toast('⚔ ВОЛНА '+waveNum+': ботов — '+n);
+}
+function arenaPlayerShot(isSmg){
+ ray.setFromCamera(V2,camera);
+ ray.far=90;
+ const meshes=[];
+ bots.forEach(b=>{b.g.traverse(o=>{if(o.isMesh)meshes.push(o);});});
+ const hits=ray.intersectObjects(meshes,false);
+ let hitBot=null;
+ if(hits.length){
+  let o=hits[0].object;
+  while(o&&!bots.find(b=>b.g===o))o=o.parent;
+  if(o)hitBot=bots.find(b=>b.g===o);
+ }
+ if(hitBot){
+  const dmg=isSmg?7:10;
+  hitBot.hp-=dmg;
+  hitBot.shakeT=0.25;
+  hitBotSfx();
+  if(hitBot.hp<=0)killBot(hitBot);
+ }else{
+  sfx(150,0.06,'square',0.03);
+ }
+ ray.far=7;
+}
+function killBot(b){
+ const bi=bots.indexOf(b);if(bi>=0)bots.splice(bi,1);
+ scene.remove(b.g);
+ botDieSfx();
+ const rub=b.boss?BOSS_FRAG_RUB:BOT_FRAG_RUB;
+ survivalScore+=b.boss?50:10;
+ arenaFrags++;
+ setMoney(money+rub);
+ if(survivalScore>bestScore){
+  bestScore=survivalScore;
+  localStorage.setItem('mg_best',String(bestScore));
+ }
+ if(b.boss){
+  bossRef=null;
+  toast('БОСС ПОВЕРЖЕН! +'+BOSS_FRAG_RUB+' ₽ и +50 очков! 🏆');
+ }
+ updWaveChip();
+ if(Math.random()<0.3)spawnMedkit(b.x,b.z);
+ if(bots.length===0&&arenaActive){
+  const bonus=waveNum*20;
+  setMoney(money+bonus);
+  coin();
+  toast('Волна '+waveNum+' зачищена! Бонус +'+bonus+' ₽ 🎉');
+  wavePending=true;waveCd=4;
+ }
+}
+function spawnMedkit(x,z){
+ const g=new THREE.Group();
+ const box=new THREE.Mesh(roundedBox(0.5,0.4,0.4,0.05),new THREE.MeshStandardMaterial({map:medkitTex,roughness:0.7}));
+ box.position.y=0.55;box.castShadow=true;g.add(box);
+ g.position.set(x!==undefined?x:ARENA.x+(Math.random()-0.5)*(ARENA_RADIUS*1.2),0,z!==undefined?z:ARENA.z+(Math.random()-0.5)*(ARENA_RADIUS*1.2));
+ scene.add(g);
+ medkits.push({g,x:g.position.x,z:g.position.z,ph:Math.random()*6});
+}
+function spawnMedkits(n){for(let i=0;i<n;i++)spawnMedkit();}
+function updateMedkits(dt,ts){
+ for(let i=medkits.length-1;i>=0;i--){
+  const mk=medkits[i];
+  mk.g.position.y=0.15+Math.sin(ts*0.003+mk.ph)*0.12;
+  mk.g.rotation.y=ts*0.001;
+  if(playerHP<MAX_HP&&Math.hypot(mk.x-player.x,mk.z-player.z)<1.6){
+   healPlayer(25);
+   healSfx();
+   toast('Аптечка! +25 HP ❤');
+   scene.remove(mk.g);
+   medkits.splice(i,1);
+  }
+ }
+}
+function fireBotBullet(bot){
+ const from=new THREE.Vector3(bot.x,bot.boss?2.2:1.4,bot.z);
+ const target=new THREE.Vector3(player.x,player.y+1.2,player.z);
+ const dir=target.clone().sub(from).normalize();
+ const err=0.06+Math.hypot(bot.x-player.x,bot.z-player.z)*0.004;
+ dir.x+=(Math.random()-0.5)*err;
+ dir.y+=(Math.random()-0.5)*err*0.5;
+ dir.z+=(Math.random()-0.5)*err;
+ dir.normalize();
+ const m=new THREE.Mesh(new THREE.SphereGeometry(0.09,6,6),new THREE.MeshBasicMaterial({color:0xff6a4a}));
+ m.position.copy(from);
+ scene.add(m);
+ arenaBullets.push({m,v:dir.multiplyScalar(bot.boss?30:24),ttl:2.5,fromBot:true});
+ botShotSfx();
+}
+function updateArenaBullets(dt){
+ for(let i=arenaBullets.length-1;i>=0;i--){
+  const b=arenaBullets[i];
+  b.ttl-=dt;
+  b.m.position.addScaledVector(b.v,dt);
+  let dead=false;
+  if(b.fromBot){
+   const d=Math.hypot(b.m.position.x-player.x,b.m.position.z-player.z);
+   const dy=Math.abs(b.m.position.y-(player.y+1.2));
+   if(d<0.7&&dy<1.3){
+    takeDamage(8);
+    dead=true;
+   }
+  }
+  if(!dead&&Math.hypot(b.m.position.x-ARENA.x,b.m.position.z-ARENA.z)>ARENA_RADIUS+4)dead=true;
+  if(b.ttl<=0)dead=true;
+  if(dead){scene.remove(b.m);arenaBullets.splice(i,1);}
+ }
+}
+let hurtCd=0;
+function takeDamage(amount){
+ if(hurtCd>0)return;
+ hurtCd=0.35;
+ playerHP=Math.max(0,playerHP-amount);
+ updHPBar();
+ playerHurtSfx();
+ if(playerHP<=0)endArena(false);
+}
+function healPlayer(amount){
+ playerHP=Math.min(MAX_HP,playerHP+amount);
+ updHPBar();
+}
+function enterArena(){
+ if(arenaActive)return;
+ arenaActive=true;
+ playerHP=MAX_HP;
+ survivalScore=0;
+ arenaFrags=0;
+ waveNum=0;
+ wavePending=false;
+ bots.forEach(b=>scene.remove(b.g));
+ bots.length=0;
+ arenaBullets.forEach(b=>scene.remove(b.m));
+ arenaBullets.length=0;
+ medkits.forEach(m=>scene.remove(m.g));
+ medkits.length=0;
+ player.set(ARENA.x,0,ARENA.z+ARENA_RADIUS-4);
+ yaw=Math.PI;pitch=-0.05;
+ arenaRing.material.color.setHex(0xff3a2a);
+ wavePending=true;waveCd=1.2;
+ updHPBar();updWaveChip();
+ bossSfx();
+ toast('АРЕНА! Продержись как можно дольше. Выход — красная плита на юге 🎯');
+ if((gunHave||smgHave)&&selMat!=='gun'&&selMat!=='smg')selectMat(smgHave?'smg':'gun');
+}
+function endArena(won){
+ arenaActive=false;
+ if(survivalScore>bestScore){
+  bestScore=survivalScore;
+  localStorage.setItem('mg_best',String(bestScore));
+ }
+ bots.forEach(b=>scene.remove(b.g));
+ bots.length=0;
+ bossRef=null;
+ arenaBullets.forEach(b=>scene.remove(b.m));
+ arenaBullets.length=0;
+ medkits.forEach(m=>scene.remove(m.g));
+ medkits.length=0;
+ arenaRing.material.color.setHex(0xffaa00);
+ $('waveChip').style.display='none';
+ updHPBar();
+ player.set(ARENA_GATE.x,0,ARENA_GATE.z+2);
+ if(won)toast('Арена пройдена! Счёт: '+survivalScore+' 🏁');
+ else{
+  coin();
+  toast('Ты выбыл… Счёт выживания: '+survivalScore+' очк. (рекорд: '+bestScore+') 🏁');
+ }
+ saveWorld();
+}
+function arenaTick(dt){
+ if(!arenaActive)return;
+ if(wavePending){
+  waveCd-=dt;
+  if(waveCd<=0){wavePending=false;spawnWave();}
+ }
+ hurtCd=Math.max(0,hurtCd-dt);
+ for(let i=bots.length-1;i>=0;i--){
+  const b=bots[i];
+  const dx=player.x-b.x,dz=player.z-b.z;
+  const d=Math.hypot(dx,dz)||1;
+  const nx=dx/d,nz=dz/d;
+  const keep=b.boss?8:5;
+  const moveDir=(d>keep?1:(d<keep-3?-0.6:0));
+  const mx=nx*moveDir+(-nz)*b.strafe*0.6;
+  const mz=nz*moveDir+(nx)*b.strafe*0.6;
+  const ml=Math.hypot(mx,mz)||1;
+  const spd=(b.boss?1.4:2.2)*(1+waveNum*0.04);
+  b.x+=mx/ml*spd*dt;
+  b.z+=mz/ml*spd*dt;
+  const rx=b.x-ARENA.x,rz=b.z-ARENA.z;
+  const rd=Math.hypot(rx,rz);
+  if(rd>ARENA_RADIUS-1){
+   b.x=ARENA.x+rx/rd*(ARENA_RADIUS-1);
+   b.z=ARENA.z+rz/rd*(ARENA_RADIUS-1);
+  }
+  if(Math.random()<dt*0.5)b.strafe=-b.strafe;
+  b.g.position.set(b.x,b.g.position.y,b.z);
+  b.g.rotation.y=Math.atan2(nx,nz);
+  if(b.shakeT>0){
+   b.shakeT-=dt;
+   b.g.position.x+=Math.sin(performance.now()*0.05)*0.03;
+  }
+  b.g.position.y=Math.abs(Math.sin(performance.now()*0.008+i))*0.04;
+  b.cd-=dt;
+  if(b.cd<=0&&d<28){
+   if(b.boss){
+    fireBotBullet(b);
+    setTimeout(()=>{if(bots.includes(b))fireBotBullet(b);},130);
+    setTimeout(()=>{if(bots.includes(b))fireBotBullet(b);},260);
+    b.cd=2.2;
+   }else{
+    fireBotBullet(b);
+    b.cd=1.6+Math.random();
+   }
+  }
+ }
+}
+function leaveArenaCheck(){
+ if(!arenaActive)return;
+ if(Math.hypot(player.x-ARENA_GATE.x,player.z-ARENA_GATE.z)<2.4){
+  endArena(true);
+  toast('Выход с арены. Счёт сохранён в рекорде 🏁');
+ }
+}
 function houseAppraisal(){
  let total=0,count=0;
  for(const p of pieces){
@@ -2091,17 +2474,167 @@ function nearBusStop(){
  if(Math.hypot(PORT_BUS_POS.x-player.x,PORT_BUS_POS.z-player.z)<4)return PORT_BUS_POS;
  return null;
 }
+/* ===== СПРИНТ 15: ВЕРТОДРОМ, ПИЛОТ МАРГО, ВЕРТОЛЁТ ===== */
+const HELIPAD=new THREE.Vector3(ISLAND.x+6,0,ISLAND.z+6);
+(function(){
+ const pad=new THREE.Mesh(new THREE.CircleGeometry(6,28),matOf(0xb8bcc0));
+ pad.rotation.x=-Math.PI/2;pad.position.set(HELIPAD.x,1.24,HELIPAD.z);
+ pad.receiveShadow=true;pad.userData.ground=true;scene.add(pad);
+ const ringW=new THREE.Mesh(new THREE.RingGeometry(5.4,5.8,28),new THREE.MeshStandardMaterial({color:0xf0f0e0}));
+ ringW.rotation.x=-Math.PI/2;ringW.position.set(HELIPAD.x,1.25,HELIPAD.z);scene.add(ringW);
+ const h1=new THREE.Mesh(new THREE.BoxGeometry(0.6,0.03,2.6),matOf(0xf0f0e0));
+ h1.position.set(HELIPAD.x-0.5,1.26,HELIPAD.z);scene.add(h1);
+ const h2=h1.clone();h2.position.x=HELIPAD.x+0.5;scene.add(h2);
+ const h3=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.03,0.6),matOf(0xf0f0e0));
+ h3.position.set(HELIPAD.x,1.26,HELIPAD.z);scene.add(h3);
+ [[5.2,0],[-5.2,0],[0,5.2],[0,-5.2]].forEach(p=>{
+  const l=new THREE.Mesh(new THREE.SphereGeometry(0.12,8,6),new THREE.MeshStandardMaterial({color:0xffe080,emissive:0xffc040,emissiveIntensity:0.9}));
+  l.position.set(HELIPAD.x+p[0],1.28,HELIPAD.z+p[1]);scene.add(l);
+ });
+})();
+const PILOT=new THREE.Vector3(HELIPAD.x-4,0,HELIPAD.z+2);
+const pilotNpc=makePerson({shirt:0x3a7ab0,pants:0x2a3a4a,hat:0x222833,hair:0x2a1a0a});
+pilotNpc.position.set(PILOT.x,1.2,PILOT.z);scene.add(pilotNpc);
+sign2('ВЕРТОДРОМ ZINI',HELIPAD.x,4.6,HELIPAD.z-6,0.62);
+function makeHeliMesh(){
+ const g=new THREE.Group();
+ const bodyM=matOf(0xd85a2a);
+ const body=new THREE.Mesh(roundedBox(1.5,1.1,3.2,0.4),bodyM);
+ body.position.y=1.1;body.castShadow=true;g.add(body);
+ const nose=new THREE.Mesh(roundedBox(1.2,0.9,1.2,0.4),new THREE.MeshStandardMaterial({color:0x9ecfe8,roughness:0.0,metalness:0.3,transparent:true,opacity:0.6}));
+ nose.position.set(0,1.15,-1.9);g.add(nose);
+ const tail=new THREE.Mesh(new THREE.BoxGeometry(0.4,0.4,2.6),bodyM);
+ tail.position.set(0,1.35,2.4);tail.castShadow=true;g.add(tail);
+ const fin=new THREE.Mesh(new THREE.BoxGeometry(0.12,1.1,0.5),bodyM);
+ fin.position.set(0,1.9,3.4);g.add(fin);
+ const tr=new THREE.Mesh(new THREE.BoxGeometry(0.06,1.4,0.16),matOf(0x2a2a30));
+ tr.position.set(0.18,1.9,3.4);g.add(tr);
+ const mast=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.1,0.5,8),matOf(0x2a2a30));
+ mast.position.y=1.85;g.add(mast);
+ const rotor=new THREE.Group();
+ rotor.position.y=2.1;
+ [-1,1].forEach(s=>{
+  const bl=new THREE.Mesh(new THREE.BoxGeometry(5.4,0.05,0.28),matOf(0x2a2a30));
+  bl.rotation.y=s*Math.PI/2;
+  rotor.add(bl);
+ });
+ g.add(rotor);
+ [-0.7,0.7].forEach(x=>{
+  const skid=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,2.8,6),matOf(0x3a3a3a));
+  skid.rotation.x=Math.PI/2;skid.position.set(x,0.1,0);g.add(skid);
+  [-0.9,0.9].forEach(z=>{
+   const leg2=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.6,6),matOf(0x3a3a3a));
+   leg2.position.set(x,0.4,z);g.add(leg2);
+  });
+ });
+ g.traverse(m=>{if(m.isMesh)m.castShadow=true;});
+ return g;
+}
+const heliMesh=makeHeliMesh();
+heliMesh.position.set(HELIPAD.x,1.25,HELIPAD.z);
+scene.add(heliMesh);
+const TOUR_PTS=[
+ [0,44,-26],[-20,48,-11],[-90,58,20],[14,46,-16],
+ [100,52,-16],[100,56,-52],[180,48,45],[203,52,-30],
+ [252,56,75],[176,46,54]
+];
+const TOUR_SEG=6;
+function nearPilot(){return Math.hypot(PILOT.x-player.x,PILOT.z-player.z)<4;}
+function nearHeli(){return heliOwned&&Math.hypot(heliMesh.position.x-player.x,heliMesh.position.z-player.z)<4.5&&player.y<2.5;}
+function canLandHere(){return player.x<140||nearPierExit()||nearIslandExit();}
+function boardHeli(){
+ flying=true;landingNow=false;tourActive=false;
+ player.y=30;
+ heliMesh.visible=false;
+ toast('Вертолёт в воздухе! Прыжок — набор высоты, Действие — посадка 🚁');
+ sfx(95,0.4,'sawtooth',0.04);
+ closeDialog();
+}
+function startLanding(){
+ landingNow=true;
+ toast('Заходим на посадку… 🚁');
+}
+function landHeli(){
+ const sup=supportHeight();
+ flying=false;landingNow=false;
+ player.y=Math.max(sup,0);
+ heliMesh.position.set(player.x,sup+0.05,player.z);
+ heliMesh.rotation.y=yaw;
+ heliMesh.visible=true;
+ toast('Посадка! Выходи и осматривайся 🚁');
+ sfx(120,0.3,'sawtooth',0.04);
+ saveWorld();
+}
+function startTour(){
+ if(money<250&&!heliOwned){toast('Обзорный полёт стоит 250 ₽');return;}
+ if(!heliOwned)setMoney(money-250);
+ flying=true;tourActive=true;landingNow=false;
+ tourT=0;
+ toast('Взлёт! Обзорный тур над всем ZINI CITY 🚁');
+ sfx(95,0.5,'sawtooth',0.04);
+ closeDialog();
+}
+function endTour(early){
+ tourActive=false;flying=false;landingNow=false;
+ player.set(HELIPAD.x,1.25,HELIPAD.z);
+ heliMesh.position.set(HELIPAD.x,1.25,HELIPAD.z);
+ heliMesh.visible=true;
+ yaw=Math.PI;pitch=-0.15;
+ toast(early?'Тур прерван — вернулись на вертодром':'Тур окончен! Красивый город, правда? 🚁');
+ saveWorld();
+}
+function openPilotDialog(){
+ dlgOpen=true;
+ $('dlg').style.display='flex';
+ $('dlgName').textContent='ВЕРТОДРОМ · ПИЛОТ МАРГО';
+ $('dlgText').textContent='Марго: О, привет, '+NICK+'! Отсюда весь город как на ладони. Обзорный тур — 250 ₽: пронесёмся над мэрией, ареной, портом и маяком. А если купишь мой вертолёт — летай когда хочешь и садись где угодно, кроме воды!';
+ const btns=$('dlgBtns');btns.innerHTML='';
+ const t=document.createElement('button');t.className='dbtn good';
+ t.textContent='Обзорный полёт (250 ₽)';
+ t.disabled=money<250&&!heliOwned;
+ t.onclick=startTour;
+ btns.appendChild(t);
+ if(!heliOwned){
+  const h=document.createElement('button');h.className='dbtn';
+  h.textContent='Купить вертолёт (2000 ₽)';
+  h.disabled=money<2000;
+  h.onclick=()=>{
+   setMoney(money-2000);
+   heliOwned=true;localStorage.setItem('mg_heli','1');
+   coin();toast('Вертолёт твой! Садись на вертодроме 🚁');
+   openPilotDialog();
+  };
+  btns.appendChild(h);
+ }else{
+  const f=document.createElement('button');f.className='dbtn';
+  f.textContent='Сесть за штурвал (свободный полёт)';
+  f.onclick=()=>{
+   if(Math.hypot(heliMesh.position.x-player.x,heliMesh.position.z-player.z)<6){boardHeli();}
+   else{toast('Вертолёт не здесь — подойди к нему');closeDialog();}
+  };
+  btns.appendChild(f);
+ }
+ const c=document.createElement('button');c.className='dbtn alt';c.textContent='Закрыть';c.onclick=closeDialog;btns.appendChild(c);
+ if(document.pointerLockElement)document.exitPointerLock();
+ $('lockHint').style.display='none';
+ sfx(500,0.06,'sine',0.04);
+}
 function contextAction(){
  heldSwing=0.3;
- if(sailing){
-  if(jobActive&&(carrying||carryCount>0)&&Math.hypot((jobType==='port'?PORT_ZONE:ZONE).x-player.x,(jobType==='port'?PORT_ZONE:ZONE).z-player.z)<2.6){deliverBox();return;}
-  if(nearPierExit()||nearIslandExit()){toggleBoat();return;}
-  if(nearOcto()){catchOcto();return;}
-  toast('К берегу — выйти можно у причала или на острове');
+ if(tourActive){endTour(true);return;}
+ if(flying){
+  if(landingNow){landingNow=false;toast('Отмена посадки — набираем высоту');}
+  else startLanding();
   return;
  }
- if(selMat==='gun'){fireGun();return;}
- if(selMat==='smg'){fireGun();return;}
+ if(selMat==='gun'||selMat==='smg'){fireGun();return;}
+ if(nearPilot()){openPilotDialog();return;}
+ if(nearHeli()){boardHeli();return;}
+ if(Math.hypot(ARENA_GATE.x-player.x,ARENA_GATE.z-player.z)<2.6){
+  if(gunHave||smgHave)openDialog('arena');
+  else toast('Без оружия на арену страшно — Сергей выдаёт пистолет бесплатно 🔫');
+  return;
+ }
  if(nearGarage()){trolleyAction();return;}
  const bs=nearBusStop();
  if(bs){openDialog('bus');return;}
@@ -2131,7 +2664,7 @@ function contextAction(){
   const z=jobType==='port'?PORT_ZONE:ZONE;
   if(carrying||carryCount>0){
    if(Math.hypot(z.x-player.x,z.z-player.z)<2.6)deliverBox();
-   else toast(jobType==='port'?'Неси груз к жёлтому кольцу причала 📦':'Неси груз в руки к зелёному кольцу 📦');
+   else toast(jobType==='port'?'Неси груз к жёлтому кольцу причала 📦':'Неси ящик к зелёному кольцу 📦');
    return;
   }
   const b=nearestJobBox();
@@ -2147,7 +2680,7 @@ function contextAction(){
    }
    return;
   }
-  toast(jobType==='port'?'Ящики на краю причла — осталось '+boxesLeft:'Ящики у общежития — осталось '+boxesLeft);
+  toast(jobType==='port'?'Ящики на краю причала — осталось '+boxesLeft:'Ящики у общежития — осталось '+boxesLeft);
   return;
  }
  const lt=nearestLandedTree();
@@ -2179,7 +2712,7 @@ function nearestJobBox(){
 }
 function placePiece(){
  if(selMat==='axe'||selMat==='pick'||selMat==='gun'||selMat==='smg'){toast('Это не строительный инструмент');return;}
- if(sailing){toast('Строить с лодки нельзя');return;}
+ if(sailing||flying){toast('Строить с воздуха нельзя');return;}
  if(trolleyCarried||carrying){toast('Руки заняты тележкой/ящиком!');return;}
  const c=computePlacement();
  if(!c.ok){toast(c.reason);sfx(220,0.1,'square',0.04);return;}
@@ -2189,8 +2722,8 @@ function placePiece(){
  thunk();UIC();
 }
 function breakPiece(){
- if(selMat==='axe'||selMat==='pick'||selMat==='gun'||selMat==='smg'){toast('Это не строительный инструмент');return;}
- if(sailing){toast('Ломать с лодки нельзя');return;}
+ if(selMat==='axe'||selMat==='pick'||selMat==='gun'||selMat==='smg'){toast(' это не строительный инструмент');return;}
+ if(sailing||flying){toast('Ломать с воздуха нельзя');return;}
  if(trolleyCarried||carrying){toast('Руки заняты!');return;}
  ray.setFromCamera(V2,camera);
  const hits=ray.intersectObjects(pieces.map(p=>p.mesh),true);
@@ -2214,8 +2747,8 @@ function updateHighlight(dt){
  Object.keys(ghost).forEach(k=>ghost[k].visible=false);
  hi.visible=false;
  $('cross').classList.toggle('hot',(selMat==='gun'||selMat==='smg')&&!reloading&&(selMat==='smg'?magS:magP)>0);
- if(sailing||carrying||carryCount>0||jobActive||trolleyCarried)return;
- if((selMat==='gun'||selMat==='smg')){
+ if(sailing||flying||carrying||carryCount>0||jobActive||trolleyCarried)return;
+ if(selMat==='gun'||selMat==='smg'){
   ray.setFromCamera(V2,camera);
   const hits=ray.intersectObjects(RANGE_TARGETS.filter(t=>!t.down).map(t=>t.board),false);
   if(hits.length&&hits[0].distance<90){
@@ -2225,7 +2758,8 @@ function updateHighlight(dt){
   }
   return;
  }
- if((selMat==='axe'||selMat==='pick')&&mode==='build'){
+ if(selMat==='axe'||selMat==='pick'){
+  if(mode!=='build')return;
   const target=selMat==='axe'?chopTrees.filter(t=>!t.falling).map(t=>t.trunk):rocks.map(r=>r.m);
   const prop=selMat==='axe'?'chop':'rock';
   ray.setFromCamera(V2,camera);
@@ -2280,7 +2814,7 @@ function makeToolMesh(kind){
  handle.rotation.x=Math.PI/2;handle.position.set(0,0.05,-0.28);g.add(handle);
  if(kind==='axe'){
   const head=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.16,0.09),matOf(0xb8c0c8));
-  head.position.set(0,0.09,-0.52);g.add(head);
+  head.position.set(x:0,0.09,-0.52);g.add(head);
   const blade=new THREE.Mesh(new THREE.ConeGeometry(0.09,0.16,4),matOf(0xd8e0e8));
   blade.rotation.x=Math.PI/2;blade.rotation.z=Math.PI/4;blade.position.set(0,0.09,-0.62);g.add(blade);
  }else{
@@ -2309,7 +2843,7 @@ function makeRodMesh(){
 }
 function makePaddleMesh(){
  const g=new THREE.Group();
- const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.022,1.2,6),matOf(0x7a5330));
+ const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.022,1.2,6),matOf(0x7a5330);
  shaft.rotation.x=Math.PI/2-0.15;shaft.position.set(0,0.05,-0.55);g.add(shaft);
  const blade=new THREE.Mesh(roundedBox(0.18,0.02,0.3,0.02),matOf(0x9a7a4e));
  blade.position.set(0,-0.12,-1.05);g.add(blade);
@@ -2361,35 +2895,37 @@ held.rotation.set(0.2,-0.4,0.08);
 camera.add(held);
 let heldSwing=0;
 function updateHeld(){
- const noHand=trolleyCarried||sailing;
- const isGun=selMat==='gun',isSmg=selMat==='smg';
- heldBrick.visible=selMat==='brick'&&!noHand&&!isGun&&!isSmg;
+ const noHand=trolleyCarried||sailing||flying;
+ heldBrick.visible=selMat==='brick'&&!noHand;
  heldBoard.visible=selMat==='board'&&!noHand;
  heldWindow.visible=selMat==='glass'&&!noHand;
  heldAxe.visible=selMat==='axe'&&!noHand;
  heldPick.visible=selMat==='pick'&&!noHand;
  heldStone.visible=selMat==='stone'&&!noHand;
  heldSand.visible=selMat==='sand'&&!noHand;
- heldGun.visible=isGun&&!noHand;
- heldSmg.visible=isSmg&&!noHand;
- heldTrolley.visible=trolleyCarried;
- heldRod.visible=rodHave&&!trolleyCarried&&!sailing&&!isGun&&!isSmg&&(nearFish()||fishState>0);
+ heldGun.visible=selMat==='gun'&&!noHand;
+ heldSmg.visible=selMat==='smg'&&!noHand;
+ heldTrolley.visible=trolleyCarried&&!flying;
+ heldRod.visible=rodHave&&!trolleyCarried&&!sailing&&!flying&&selMat!=='gun'&&selMat!=='smg'&&(nearFish()||fishState>0);
  heldPaddle.visible=sailing;
+ held.visible=!(flying||tourActive);
 }
 updateHeld();
 const hintEl=$('hint');
-hintEl.style.cssText='position:absolute;left:50%;bottom:92px;transform:translateX(-50%);background:rgba(46,227,139,.92);color:#06251a;border-radius:12px;padding:7px 14px;font-size:12.5px;font-weight:900;display:none;pointer-events:none';
+hintEl.style.cssText='position:absolute;left:50%;bottom:92px;transform:translateX(-50%);background:rgba(46,227,139,.92);color:#06251a;border-radius:12px;padding:7px 14px;font-size:12.5px;fontWeight:900;display:none;pointerEvents:none';
 function updateHint(){
  let t='';
- if(sailing){
-  const z=jobType==='port'?PORT_ZONE:ZONE;
-  let ts2='На воде · Действие — выйти у берега';
-  if(jobActive&&(carrying||carryCount>0)&&Math.hypot(z.x-player.x,z.z-player.z)<2.6)ts2='Действие — сдать груз с воды (+'+((carrying?1:carryCount)*payPerBox())+' ₽)';
-  else if(nearOcto())ts2='Действие — поймать осьминога (+150 ₽) 🐙';
-  hintEl.style.display='block';hintEl.textContent=ts2;return;
+ if(tourActive){hintEl.style.display='block';hintEl.textContent='Обзорный полёт над ZINI CITY · Действие — завершить тур 🚁';return;}
+ if(flying){
+  hintEl.style.display='block';
+  hintEl.textContent=landingNow?'Идёт посадка… держись!':'Полёт · Прыжок — выше · Действие — посадка 🚁';
+  return;
  }
- if(selMat==='gun')t= reloading?'Перезарядка…':'Действие/клик — выстрел 🔫 (в магазине: '+magP+')';
- else if(selMat==='smg')t= reloading?'Перезарядка…':'Действие/клик — огонь очередями 🔫 (в магазине: '+magS+')';
+ if(selMat==='gun')t=reloading?'Перезарядка…':'Действие/клик — выстрел 🔫 (в магазине: '+magP+')';
+ else if(selMat==='smg')t=reloading?'Перезарядка…':'Действие/клик — огонь очередями 🔫 (в магазине: '+magS+')';
+ else if(nearPilot())t='Действие — пилот Марго (туры и вертолёт) 🚁';
+ else if(nearHeli())t='Действie — сесть в вертолёт';
+ else if(Math.hypot(ARENA_GATE.x-player.x,AREN_GATE.z-player.z)<2.6)t='Действие — войти на арену (рекорд: '+bestScore+')';
  else if(nearGarage())t=trolleyCarried?'Действие — убрать тележку в гараж':'Действие — взять тележку';
  else if(nearBusStop())t='Действие — автобус №7 (проезд 20 ₽)';
  else if(nearBoat())t=boatHave?'Действие — сесть в лодку':'Лодку продаёт Борис в порту (800 ₽)';
@@ -2406,17 +2942,17 @@ function updateHint(){
  if(!t&&Math.hypot(PLANT_REF().x-player.x,(PLANT_REF().z+1.5)-player.z)<3.2)t='Действие — кирпичный завод (камень → кирпич)';
  if(!t&&Math.hypot(MARKET_NPC.x-player.x,MARKET_NPC.z-player.z)<3)t=marketOpen()?'Действие — рынок Марии (дорогие цены)':'Рынок закрыт (9:00–15:00)';
  if(!t&&nearSandMound())t='Действие — набрать песка (+2) ⛱';
- if(!t&&nearOcto())t='Действie — поймать осьминога (+150 ₽) 🐙';
+ if(!t&&nearOcto())t='Действие — поймать осьминога (+150 ₽) 🐙';
  if(!t&&nearFish())t=fishState===0?(rodHave?'Действие — забросить удочку':'Удочка у Фёдора 🎣'):(fishState===1?'Ждём клёва…':'КЛЮЁТ! Действие — подсечь! 🐟');
  if(!t&&jobActive){
   const z=jobType==='port'?PORT_ZONE:ZONE;
   if(carrying||carryCount>0){
-   const n=carrying?1:carryCount;
+   const n=touchFireHeld?1:carryCount;
    t=Math.hypot(z.x-player.x,z.z-player.z)<2.6
     ?'Действие — сдать груз (+'+(n*payPerBox())+' ₽)'
     :(carryCount>1?(jobType==='port'?'Вези тележку к жёлтому кольцу ('+carryCount+' ящ.)':'Вези тележку к зелёному кольцу ('+carryCount+' ящ.)'):(jobType==='port'?'Неси ящик к жёлтому кольцу':'Неси ящик к зелёному кольцу'));
   }else if(nearestJobBox())t='Действие — '+(trolleyCarried?'загрузить ящик на тележку':'взять ящик');
-  else t=(jobType==='port'?'Ящики на краю причла':'Ящики у общежития')+' — осталось '+boxesLeft;
+  else t=(jobType==='port'?'Ящики на краю причала':'Ящики у общежития')+' — осталось '+boxesLeft;
  }
  if(!t){
   const lt=nearestLandedTree();
@@ -2438,29 +2974,26 @@ function toggleMap(){
  if(mapOpen){drawMap();sfx(660,0.08,'sine',0.04);}
 }
 function drawMap(){
- const S=mapCv.width,R2=160;
+ const S=mapCv.width,R2=180;
  const sc=S/(2*R2);
  const px=x=>(x+R2)*sc,pz=z=>(z+R2)*sc;
  mg.fillStyle='#4a7a35';mg.fillRect(0,0,S,S);
  mg.fillStyle='#5c8a3c';
  for(let i=0;i<40;i++){mg.beginPath();mg.arc(Math.random()*S,Math.random()*S,4+Math.random()*10,0,7);mg.fill();}
- /* море */
  mg.fillStyle='#3a7ac8';
- mg.fillRect(px(143),pz(-160),(R2-143)*sc,320*sc);
- mg.fillRect(px(-160),pz(60),320*sc,(R2-60)*sc);
- /* песчаный остров */
+ mg.fillRect(px(143),pz(-R2),(R2-143)*sc,S);
+ mg.fillRect(px(-R2),pz(60),S,(R2-60)*sc);
  mg.fillStyle='#e8d8a0';
  mg.beginPath();mg.arc(px(ISLAND.x),pz(ISLAND.z),15*sc,0,7);mg.fill();
  mg.fillStyle='#3fa04a';
  mg.beginPath();mg.arc(px(ISLAND.x),pz(ISLAND.z),6*sc,0,7);mg.fill();
- /* причалы */
+ mg.fillStyle='#b8bcc0';
+ mg.beginPath();mg.arc(px(HELIPAD.x),pz(HELIPAD.z),6*sc,0,7);mg.fill();
+ mg.fillStyle='#f0f0e0';
+ mg.fillRect(px(HELIPAD.x-0.5),pz(HELIPAD.z-1.3),0.6*sc,2.6*sc);
+ mg.fillRect(px(HELIPAD.x-0.1),pz(HELIPAD.z-0.3),1.6*sc,0.6*sc);
  mg.fillStyle='#8a6b42';
  mg.fillRect(px(143),pz(37),70*sc,16*sc);
- /* дороги */
- mg.fillStyle='#8a6b42';
- mg.fillRect(px(113),pz(-10),4*sc,110*sc);
- mg.fillRect(px(196),pz(-24),3*sc,20*sc);
- mg.fillRect(px(200),pz(-12),4*sc,14*sc);
  mg.fillStyle='#3a3f46';
  mg.fillRect(0,pz(-3),S,6*sc);
  mg.fillRect(px(-2),pz(4),4*sc,28*sc);
@@ -2469,9 +3002,9 @@ function drawMap(){
  mg.fillRect(px(-72),pz(8),3.2*sc,24*sc);
  mg.fillRect(px(55),pz(-11.5),30*sc,3.5*sc);
  mg.fillRect(px(90),pz(-11),3.2*sc,10*sc);
+ mg.fillRect(px(97),pz(-42),3*sc,12*sc);
  mg.fillStyle='#f0f0e0';
  for(let x=-64;x<=64;x+=8)mg.fillRect(px(x),pz(-0.2),2*sc,0.4*sc);
- /* постройки */
  mg.fillStyle='#cfd4da';mg.fillRect(px(-25),pz(-15),10*sc,8*sc);
  mg.fillStyle='#b55b3c';mg.fillRect(px(-6),pz(-15.5),12*sc,9*sc);
  mg.fillStyle='#9a5f3f';mg.fillRect(px(10),pz(-19),8*sc,5*sc);
@@ -2480,32 +3013,44 @@ function drawMap(){
  mg.fillStyle='#5a6270';mg.fillRect(px(18),pz(-4.6),4*sc,2.4*sc);
  mg.fillStyle='#7fae57';mg.fillRect(px(-6),pz(24),12*sc,12*sc);
  mg.fillStyle='#9aa2aa';mg.fillRect(px(155),pz(52),10*sc,8*sc);
- /* полигон: вал, стенды */
  mg.fillStyle='#6a5a40';
  mg.fillRect(px(RANGE.x-11),pz(RANGE.z-14),22*sc,1.4*sc);
  mg.fillRect(px(RANGE.x-10.6),pz(RANGE.z-14),1.2*sc,26*sc);
  mg.fillRect(px(RANGE.x+9.4),pz(RANGE.z-14),1.2*sc,26*sc);
+ /* арена: кольцо, укрытия, плита */
+ mg.fillStyle=arenaActive?'#ff3a2a':'#ffaa00';
+ mg.beginPath();
+ mg.arc(px(ARENA.x),pz(ARENA.z),ARENA_RADIUS*sc,0,7);
+ mg.lineWidth=3;mg.strokeStyle=mg.fillStyle;mg.stroke();
+ mg.fillStyle='#8d9298';
+ [[-9,-6],[9,-6],[0,-14],[-14,4],[14,4],[-6,12],[6,12],[0,0]].forEach(p=>mg.fillRect(px(ARENA.x+p[0]-1.3),pz(ARENA.z+p[1]-0.45),2.6*sc,0.9*sc));
+ mg.fillStyle='#d84a3a';
+ mg.beginPath();mg.arc(px(ARENA_GATE.x),pz(ARENA_GATE.z),3.4*sc,0,7);mg.fill();
+ if(arenaActive){
+  bots.forEach(b=>{
+   mg.fillStyle=b.boss?'#8a1410':'#c03a2a';
+   mg.beginPath();mg.arc(px(b.x),pz(b.z),b.boss?4:2.6,0,7);mg.fill();
+  });
+  medkits.forEach(mk=>{
+   mg.fillStyle='#2ec85a';
+   mg.beginPath();mg.arc(px(mk.x),pz(mk.z),2.4,0,7);mg.fill();
+  });
+ }
+ /* мишени полигона */
  mg.fillStyle='#d84a3a';
  RANGE_TARGETS.forEach(t=>{
   if(!t.down)mg.fillRect(px(t.x-0.7),pz(t.z-0.7),1.4*sc,1.4*sc);
  });
- /* кораблик */
  mg.fillStyle='#2a4a6a';
  mg.fillRect(px(196),pz(42),8*sc,6*sc);
- /* деревья и камни */
  mg.fillStyle='#2f6b2a';
  [[30,8],[34,-6],[-30,10],[-34,-4],[26,-14],[-26,16],[-32,24],[30,26]].forEach(p=>{mg.beginPath();mg.arc(px(p[0]),pz(p[1]),3,0,7);mg.fill();});
  FOREST_SPOTS.forEach(p=>{mg.beginPath();mg.arc(px(p[0]),pz(p[1]),3,0,7);mg.fill();});
  mg.fillStyle='#8d9298';
  ROCK_SPOTS.forEach(p=>{mg.beginPath();mg.arc(px(p[0]),pz(p[1]),3,0,7);mg.fill();});
- /* пальмы острова */
- mg.fillStyle='#3fa04a';
- [[246,64],[258,66],[254,84],[247,82]].forEach(p=>{mg.beginPath();mg.arc(px(p[0]),pz(p[1]),2.4,0,7);mg.fill();});
- /* палатки рынка */
  const mOpen=marketOpen();
  mg.fillStyle=mOpen?'#4a8ad8':'#6a6a6a';
  for(let i=0;i<3;i++)mg.fillRect(px(MARKET.x-4+i*4-1.3),pz(MARKET.z-0.75),2.6*sc,1.5*sc);
- /* подписи */
  mg.font='bold 9px sans-serif';mg.textAlign='center';
  mg.fillStyle='#fff';
  mg.fillText('МЭРИЯ · БИРЖА',px(-20),pz(-11)+3);
@@ -2521,6 +3066,8 @@ function drawMap(){
  mg.fillText('КАРЬЕРА ⛏',px(80),pz(-10)+3);
  mg.fillStyle='#ffd0d0';
  mg.fillText('ПОЛИГОН 🔫',px(RANGE.x),pz(RANGE.z+4)+3);
+ mg.fillStyle='#ff9a6a';
+ mg.fillText('АРЕНА 🎯',px(ARENA.x),pz(ARENA.z+ARENA_RADIUS)+8);
  mg.fillStyle='#b0c8e0';
  mg.fillText('ГАРАЖ 🛒',px(11),pz(27)+3);
  mg.fillStyle=mOpen?'#ffe080':'#aaaaaa';
@@ -2529,8 +3076,7 @@ function drawMap(){
  mg.fillText('ПОРТ «ВОСТОЧНЫЙ»',px(178),pz(30)+3);
  mg.fillStyle='#d8b090';
  mg.fillText('ЛОДКА 🛶',px(BOAT_POS.x),pz(BOAT_POS.z)+14);
- /* маяк с красной полосой */
- const bkx=px(Math.min(CAPE.x,150)),bkz=pz(Math.max(CAPE.z,-150));
+ const bkx=px(CAPE.x),bkz=pz(CAPE.z);
  mg.fillStyle='#f2f0ea';
  mg.beginPath();mg.arc(bkx,bkz,4,0,7);mg.fill();
  mg.fillStyle='#d84a3a';
@@ -2539,27 +3085,24 @@ function drawMap(){
  mg.fillText('МАЯК 🗼',bkx,bkz-12);
  mg.fillStyle='#eaffd0';mg.font='bold 9px sans-serif';
  mg.fillText('ПЕСЧАНЫЙ ОСТРОВ ⛱',px(ISLAND.x),pz(ISLAND.z)-17);
- /* автобусные остановки */
+ mg.fillStyle='#8ac8ff';
+ mg.fillText('ВЕРТОДРОМ 🚁',px(HELIPAD.x),pz(HELIPAD.z)+18);
  mg.fillStyle='#2f7ad0';
  mg.fillRect(px(CITY_BUS_POS.x-2),pz(CITY_BUS_POS.z-1),4*sc,2*sc);
  mg.fillStyle='#d8a02f';
  mg.fillRect(px(PORT_BUS_POS.x-1),pz(PORT_BUS_POS.z-3),2*sc,6*sc);
- /* осьминог */
  if(octoAlive){
   mg.fillStyle='#b06ad8';
   mg.beginPath();mg.arc(px(OCTO.x),pz(OCTO.z),3.5,0,7);mg.fill();
   mg.fillStyle='#fff';mg.font='bold 8px sans-serif';
   mg.fillText('🐙',px(OCTO.x),pz(OCTO.z)+3);
  }
- /* лодка */
- mg.fillStyle=boatHave?'#8a5a2a':'#5a5a5a';
- const bX=sailing?px(player.x):px(BOAT_POS.x),bZ=sailing?pz(player.z):pz(BOAT_POS.z);
- mg.fillRect(bX-3,bZ-2,6,4);
- /* машина */
- const carMx=Math.max(8,Math.min(S-8,px(carX))),carMz=pz(0);
+ if(boatHave&&!sailing){
+  mg.fillStyle='#8a5a2a';
+  mg.fillRect(px(BOAT_POS.x)-3,pz(BOAT_POS.z)-2,6,4);
+ }
  mg.fillStyle='#d84a3a';
- mg.fillRect(carMx-4,carMz-3,8,6);
- /* игрок */
+ mg.fillRect(Math.max(0,Math.min(S-8,px(carX)))-4,pz(0)-3,8,6);
  const mx=Math.max(8,Math.min(S-8,px(player.x))),mz=Math.max(8,Math.min(S-8,pz(player.z)));
  mg.save();
  mg.translate(mx,mz);
@@ -2568,10 +3111,17 @@ function drawMap(){
  mg.beginPath();mg.moveTo(0,-9);mg.lineTo(6,7);mg.lineTo(-6,7);mg.closePath();mg.fill();mg.stroke();
  mg.restore();
 }
+/* ===== ЗАПУСК ===== */
+const rotorObj=(function(){
+ let r=null;
+ heliMesh.traverse(o=>{if(o.isGroup&&!r)r=o;});
+ return r;
+})();
+heliMesh.visible=heliOwned;
 const hadSave=loadWorld();
-if(!hadSave)toast('ZINI CITY! Полигон — за карьером, мастер Сергей выдаёт пистолет 🔫');
-updAmmoChip();
-let lastTs=0,carHonked=false;
+if(!hadSave)toast('ZINI CITY! Полигон за карьером, арена за полигоном, а вертодром — на острове 🔫🚁');
+updAmmoChip();updHPBar();updWaveChip();
+let lastTs=0,carHonked=false,engSndT=0;
 function loop(ts){
  requestAnimationFrame(loop);
  const dt=Math.min(0.033,(ts-lastTs)/1000||0.016);lastTs=ts;
@@ -2620,7 +3170,6 @@ function loop(ts){
   fishT-=dt;
   if(fishT<=0){fishState=0;toast('Поклёвка пропущена — рыба уплыла…');}
  }
- /* лодка */
  if(sailing){
   boatWorld.position.set(player.x,0.05+Math.sin(ts*0.002)*0.06,player.z);
   boatWorld.rotation.y=yaw;
@@ -2628,7 +3177,6 @@ function loop(ts){
   boatWorld.position.set(BOAT_POS.x,0.05+Math.sin(ts*0.002)*0.06,BOAT_POS.z);
   boatWorld.rotation.y=Math.PI/2;
  }
- /* осьминог */
  if(octoAlive){
   octo.position.set(OCTO.x+Math.sin(ts*0.001)*1.5,0.15+Math.sin(ts*0.003)*0.15,OCTO.z+Math.cos(ts*0.0013)*1.5);
   octo.rotation.y=ts*0.0008;
@@ -2636,7 +3184,6 @@ function loop(ts){
   octoTimer-=dt;
   if(octoTimer<=0){octoAlive=true;octo.visible=true;toast('Осьминог показался у острова 🐙');}
  }
- /* мишени полигона: падение и подъём */
  RANGE_TARGETS.forEach(t=>{
   if(t.down){
    t.timer-=dt;
@@ -2647,7 +3194,6 @@ function loop(ts){
    }
   }
  });
- /* гильзы: полёт, падение, уборка */
  for(let i=casings.length-1;i>=0;i--){
   const c=casings[i];
   c.userData.life-=dt;
@@ -2659,7 +3205,6 @@ function loop(ts){
    scene.remove(c);casings.splice(i,1);
   }
  }
- /* перезарядка */
  if(reloading){
   reloadT-=dt;
   if(reloadT<=0){
@@ -2675,14 +3220,91 @@ function loop(ts){
    sfx(700,0.07,'square',0.05);
   }
  }
- /* автомат: очередь при зажатии */
  const fireHeld=(IS_TOUCH?touchFireHeld:mouseHeld);
  if(selMat==='smg'&&fireHeld&&!dlgOpen&&!mapOpen&&!reloading){
   smgCd-=dt;
   if(smgCd<=0){fireGun();smgCd=0.11;}
  }
  if(selMat!=='smg')smgCd=0;
- /* машина */
+ /* ===== АРЕНА ===== */
+ if(arenaActive){
+  arenaTick(dt);
+  updateArenaBullets(dt);
+  updateMedkits(dt,ts);
+  leaveArenaCheck();
+  updWaveChip();
+ }
+ /* ===== ВЕРТОЛЁТ (Спринт 15) ===== */
+ if(rotorObj){
+  const spinSpeed=flying||tourActive?22:(heliMesh.visible?1.5:0);
+  rotorObj.rotation.y+=dt*spinSpeed;
+ }
+ if(flying||tourActive){
+  /* звук несущего винта */
+  engSndT-=dt;
+  if(engSndT<=0){engSndT=0.5;sfx(85,0.45,'sawtooth',0.028);}
+  if(tourActive){
+   /* тур по точкам */
+   const total=(TOUR_PTS.length-1)*TOUR_SEG;
+   tourT=Math.min(total,tourT+dt);
+   const seg=Math.min(TOUR_PTS.length-2,Math.floor(tourT/TOUR_SEG));
+   const f=(tourT-seg*TOUR_SEG)/TOUR_SEG;
+   const a=TOUR_PTS[seg],b=TOUR_PTS[seg+1];
+   player.x=a[0]+(b[0]-a[0])*f;
+   player.y=a[1]+(b[1]-a[1])*f;
+   player.z=a[2]+(b[2]-a[2])*f;
+   const dx=b[0]-a[0],dz=b[2]-a[2];
+   if(Math.abs(dx)+Math.abs(dz)>0.01)yaw=Math.atan2(-dx,-dz);
+   if(tourT>=total)endTour(false);
+  }else{
+   /* свободный полёт */
+   let ix=0,iz=0;
+   if(IS_TOUCH){ix=joyVec.x;iz=-joyVec.y;}
+   else{
+    if(keys.KeyW||keys.ArrowUp)iz+=1;
+    if(keys.KeyS||keys.ArrowDown)iz-=1;
+    if(keys.KeyA||keys.ArrowLeft)ix-=1;
+    if(keys.KeyD||keys.ArrowRight)ix+=1;
+   }
+   const mv=Math.hypot(ix,iz);
+   if(mv>0.08){
+    const s2=Math.min(1,mv);
+    const fx=-Math.sin(yaw),fz=-Math.cos(yaw),rx=Math.cos(yaw),rz=-Math.sin(yaw);
+    const spd=14*s2;
+    player.x+=(fx*iz+rx*ix)*spd*dt;
+    player.z+=(fz*iz+rz*ix)*spd*dt;
+   }
+   const climb=(IS_TOUCH?touchJumpHeld:(keys.Space||keys.KeyW));
+   if(!landingNow){
+    player.y=Math.min(60,player.y+(climb?9:1.2)*dt);
+   }else{
+    player.y-=7*dt;
+   }
+   const sup=supportHeight();
+   if(landingNow&&player.y<=Math.max(sup,0.1)){
+    if(canLandHere()){
+     landHeli();
+    }else{
+     landingNow=false;
+     player.y=Math.max(sup,4);
+     toast('Над водой садиться нельзя! К земле или причалу 🚁');
+    }
+   }
+   if(player.y<=1.4&&!landingNow)player.y=1.4;
+  }
+  player.x=Math.max(-240,Math.min(300,player.x));
+  player.z=Math.max(-240,Math.min(300,player.z));
+  camera.position.set(player.x,player.y+EYE,player.z);
+  camera.rotation.order='YXZ';
+  camera.rotation.set(pitch,yaw,0);
+  armR.rotation.set(-1.2,-0.4,0.3);
+  armL.rotation.set(-1.2,0.4,-0.3);
+  updateHeld();
+  updateHint();
+  renderer.render(scene,camera);
+  return;
+ }
+ /* ===== АВТОМАШИНА ===== */
  const ahead=carDir>0?(player.x-carX):(carX-player.x);
  const onRoad=Math.abs(player.z-0)<2.2;
  if(ahead>0&&ahead<7&&onRoad&&Math.abs(player.z-car.position.z)<3){
@@ -2742,8 +3364,11 @@ function loop(ts){
   sergeyNpc.rotation.y=Math.atan2(player.x-SERGEY.x,player.z-SERGEY.z);
   sergeyNpc.children[0].position.y=1.05+Math.sin(ts*0.0021)*0.012;
  }
+ if(Math.hypot(PILOT.x-player.x,PILOT.z-player.z)<7){
+  pilotNpc.rotation.y=Math.atan2(player.x-PILOT.x,player.z-PILOT.z);
+ }
  updateNeighbors(dt,ts);
- /* движение */
+ /* движение пешком */
  let ix=0,iz=0;
  if(IS_TOUCH){ix=joyVec.x;iz=-joyVec.y;}
  else{
